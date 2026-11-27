@@ -10,7 +10,7 @@ Your wall thermostat tells the boiler "I want heat" or "stop heating." The boile
 
 ### With SAT
 
-SAT continuously adjusts the boiler's flow temperature so it produces just enough heat to maintain your target room temperature. On a mild autumn day, the boiler might run at 35°C continuously. On a freezing winter night, it might run at 55°C. The room temperature stays steady within fractions of a degree, and the boiler runs longer at lower intensity — which is exactly how condensing boilers are designed to operate most efficiently.
+SAT continuously adjusts the boiler's flow temperature so it produces just enough heat to maintain your target room temperature. On a mild autumn day, the boiler might run at 35°C continuously. On a freezing winter night, it might run at 55°C. The room temperature stays steady within fractions of a degree, and the boiler runs longer at lower intensity. Which is exactly how condensing boilers are designed to operate most efficiently.
 
 ### Key properties
 
@@ -119,7 +119,7 @@ where:
 | `T_target` | User setting | User setting | Desired room temperature |
 | `T_outside` | OT bus or sensor | OT bus or sensor | Current outdoor temperature |
 
-The quadratic term `0.03 * (T_outside - 20)^2` models the non-linear increase in heat loss at very cold temperatures — a house loses proportionally more heat at -15°C than at +5°C.
+The quadratic term `0.03 * (T_outside - 20)^2` models the non-linear increase in heat loss at very cold temperatures. A house loses proportionally more heat at -15°C than at +5°C.
 
 ### Worked examples (radiator system, coefficient = 1.5)
 
@@ -179,7 +179,7 @@ The heating curve provides a good baseline flow temperature, but it cannot accou
 PID_output = heating_curve_value + P + I + D
 ```
 
-The PID output is not a standalone value — it is a **correction applied on top of the heating curve**. This is the key insight of the thermo-nova approach: the heating curve does the heavy lifting, and the PID fine-tunes it.
+The PID output is not a standalone value. It is a **correction applied on top of the heating curve**. This is the key insight of the thermo-nova approach: the heating curve does the heavy lifting, and the PID fine-tunes it.
 
 ### Auto-gain calculation
 
@@ -193,7 +193,7 @@ Kd = 0.07 * 8400 * Kp
 
 Where `divisor` is 3 for radiators and 4 for underfloor heating (underfloor systems respond more slowly, so gains are more conservative).
 
-**Why this works**: The heating curve coefficient already encodes how responsive your heating system needs to be. A high coefficient (poorly insulated house) means the system needs to react more aggressively — and the auto-gains scale proportionally. The constant 8400 (the "aggression factor") sets the ratio between P, I, and D terms and was tuned empirically across many installations.
+**Why this works**: The heating curve coefficient already encodes how responsive your heating system needs to be. A high coefficient (poorly insulated house) means the system needs to react more aggressively. And the auto-gains scale proportionally. The constant 8400 (the "aggression factor") sets the ratio between P, I, and D terms and was tuned empirically across many installations.
 
 ### Deadband mode switching
 
@@ -219,7 +219,7 @@ The PID uses the deadband (default 0.25°C) to switch between two operating regi
 
 **Why split this way?**
 
-- **Far from setpoint** (|error| > deadband): The derivative term dampens the approach rate, preventing overshoot. The integral would accumulate a large value during the approach that would then cause overshoot — so it is held at zero.
+- **Far from setpoint** (|error| > deadband): The derivative term dampens the approach rate, preventing overshoot. The integral would accumulate a large value during the approach that would then cause overshoot. So it is held at zero.
 - **Near setpoint** (|error| <= deadband): The derivative becomes noise-dominated at small temperature changes, so it is disabled. The integral slowly corrects any remaining steady-state offset that the P term alone cannot eliminate.
 
 ### Proportional term (P)
@@ -238,8 +238,8 @@ I += Ki * error * delta_time
 
 The integral only accumulates when `|error| <= deadband`. It has three protection mechanisms against windup:
 
-1. **Curve-value clamp**: `|I| <= curve_value` — the integral correction cannot exceed the base heating curve output
-2. **Hard absolute cap**: `|I| <= 20°C` — defense against runaway regardless of curve value
+1. **Curve-value clamp**: `|I| <= curve_value`: the integral correction cannot exceed the base heating curve output
+2. **Hard absolute cap**: `|I| <= 20°C`: defense against runaway regardless of curve value
 3. **Reset on transition**: When error crosses from outside to inside the deadband, the integral timer resets
 
 The integral also has a time limit (`SAT_PID_INTEGRAL_TIME_LIMIT = 300s`): it only begins accumulating after 5 minutes of being within the deadband. This prevents the integral from responding to brief fluctuations.
@@ -312,7 +312,7 @@ SAT supports two fundamentally different ways of controlling the boiler. Underst
 
 In continuous mode, SAT sends the PID output directly as a flow temperature setpoint via `CS=xx.x`. The boiler modulates its burner to reach and maintain this temperature. This is the preferred mode for modern condensing boilers that can modulate down to low output levels.
 
-**Flow-temperature-aware clamping**: When the PID output drops quickly (e.g., room warms up), the boiler water is still hot. Sending a sudden low setpoint would cause the boiler to stop and restart — exactly the short-cycling we want to avoid. Continuous mode clamps the minimum setpoint to `boiler_temp - 5°C`, allowing a gradual ramp-down.
+**Flow-temperature-aware clamping**: When the PID output drops quickly (e.g., room warms up), the boiler water is still hot. Sending a sudden low setpoint would cause the boiler to stop and restart. Exactly the short-cycling we want to avoid. Continuous mode clamps the minimum setpoint to `boiler_temp - 5°C`, allowing a gradual ramp-down.
 
 ```
   Flow temp
@@ -331,7 +331,7 @@ In continuous mode, SAT sends the PID output directly as a flow temperature setp
 
 ### PWM mode
 
-Some boilers cannot modulate well at low output levels — they have a minimum modulation of 30-40%, which is too much for mild weather. PWM mode solves this by cycling the flame on and off at a calculated duty cycle.
+Some boilers cannot modulate well at low output levels. They have a minimum modulation of 30-40%, which is too much for mild weather. PWM mode solves this by cycling the flame on and off at a calculated duty cycle.
 
 **How it works**:
 
@@ -398,7 +398,7 @@ Each completed cycle is classified into one of five categories:
 | Class | Condition | Meaning |
 |-------|-----------|---------|
 | **GOOD** | Duration >= 120s, flow reached setpoint, minimal overshoot | Boiler modulated correctly |
-| **OVERSHOOT** | Max flow > setpoint + 3°C for > 10s | Boiler overshot — too much heat |
+| **OVERSHOOT** | Max flow > setpoint + 3°C for > 10s | Boiler overshot. Too much heat |
 | **UNDERHEAT** | Max flow never reached setpoint - 2°C | Boiler couldn't reach setpoint |
 | **SHORT** | Duration < 60s | Flame cycled too fast |
 | **UNCERTAIN** | Duration 60-120s | Not enough data to judge |
@@ -436,7 +436,7 @@ The tracker maintains a circular buffer of the last 8 cycles. This is used for d
 
 ## Safety System
 
-Safety is the most important aspect of any heating controller. SAT implements six independent defense layers following a defense-in-depth strategy. The universal safe state is `CS=0` — which releases the control setpoint override and lets the wall thermostat control the boiler directly.
+Safety is the most important aspect of any heating controller. SAT implements six independent defense layers following a defense-in-depth strategy. The universal safe state is `CS=0`: which releases the control setpoint override and lets the wall thermostat control the boiler directly.
 
 ### Design principles
 
@@ -480,7 +480,7 @@ Safety is the most important aspect of any heating controller. SAT implements si
 
 ### Boot safety in detail
 
-After a crash, watchdog reset, or power cycle, the PIC gateway chip retains the last `CS=` value it received. Without boot safety, the boiler could continue running at the last setpoint indefinitely — even if the ESP takes minutes to fully boot.
+After a crash, watchdog reset, or power cycle, the PIC gateway chip retains the last `CS=` value it received. Without boot safety, the boiler could continue running at the last setpoint indefinitely. Even if the ESP takes minutes to fully boot.
 
 ```
   Power loss          ESP boot            PIC ready         SAT control
@@ -641,7 +641,7 @@ The SAT tab in the Web UI provides a real-time dashboard:
 - **Cycle info**: Cycle count, last classification, max flow temp
 - **ECharts graph**: Temperature history (room, outside, setpoint, heating curve) with up to 720 data points
 
-The dashboard is visualization-only — it polls `/api/v2/sat/status` every 5 seconds. All control logic runs on the ESP independently.
+The dashboard is visualization-only, it polls `/api/v2/sat/status` every 5 seconds. All control logic runs on the ESP independently.
 
 ### Using external sensors
 
@@ -696,7 +696,7 @@ Remember to enable `satexternaltemp` in settings for indoor readings, and to pus
 | Room never reaches target | Coefficient too low | Increase by 0.2-0.3 |
 | Room overshoots target | Coefficient too high | Decrease by 0.2-0.3 |
 | Frequent boiler cycling | Boiler can't modulate low enough | Check the overshoot margin |
-| Safety trips on startup | PIC not ready when SAT initializes | Normal — deferred CS=0 handles this, re-enable SAT |
+| Safety trips on startup | PIC not ready when SAT initializes | Normal. Deferred CS=0 handles this, re-enable SAT |
 | "External temp stale" in logs | Sensor push stopped | Check HA automation / MQTT connectivity |
 | High I term (>5°C) | Sustained offset, possible sensor issue | Check room temp accuracy, verify coefficient |
 
@@ -770,9 +770,9 @@ automation:
 
 ## References
 
-- **SAT upstream**: [github.com/Alexwijn/SAT](https://github.com/Alexwijn/SAT) — Original Home Assistant integration
+- **SAT upstream**: [github.com/Alexwijn/SAT](https://github.com/Alexwijn/SAT). Original Home Assistant integration
 - **OpenTherm Protocol Specification v4.2**: `docs/opentherm specification/` in this repository
-- **ADR-085**: `docs/adr/ADR-085-sat-smart-autotune-thermostat-integration.md` — Architecture decision record
-- **REST API docs**: `docs/api/README.md` — Full endpoint reference
-- **MQTT docs**: `docs/api/MQTT.md` — Topic reference
-- **OTGW firmware**: [otgw.tclcode.com](https://otgw.tclcode.com/firmware.html) — PIC gateway documentation
+- **ADR-085**: `docs/adr/ADR-085-sat-smart-autotune-thermostat-integration.md`: Architecture decision record
+- **REST API docs**: `docs/api/README.md`: Full endpoint reference
+- **MQTT docs**: `docs/api/MQTT.md`: Topic reference
+- **OTGW firmware**: [otgw.tclcode.com](https://otgw.tclcode.com/firmware.html). PIC gateway documentation

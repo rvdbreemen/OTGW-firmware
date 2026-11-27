@@ -2,13 +2,13 @@
 
 > **Entities never appeared at all** (as opposed to *duplicated* or *stale*)?
 > See **[Recovering missing HA entities](#recovering-missing-ha-entities)** below
-> first — that is usually a different, simpler situation than the upgrade
+> first, that is usually a different, simpler situation than the upgrade
 > cleanup described in the rest of this guide.
 
 ## Recovering missing HA entities
 
 **Symptom:** value topics arrive (you can see live OT values), but some or all
-Home Assistant entities never get created — no duplicates, just absent.
+Home Assistant entities never get created. No duplicates, just absent.
 
 **Background.** The firmware publishes each OT MsgID's discovery config
 **just-in-time**: the config for a given MsgID is sent the first time that
@@ -17,7 +17,7 @@ MsgID is seen on the OpenTherm bus after the ESP (re)starts, then the broker
 
 - Entities appear **progressively**, not all at once. Frequently-polled values
   (room/boiler temperature, setpoints) show up within seconds; rarely-sent
-  diagnostic IDs can take minutes — or never, if the boiler never sends them.
+  diagnostic IDs can take minutes, or never, if the boiler never sends them.
 - A **PIC-only reset does not re-publish anything**, and it does not need to:
   the `GW=R` command and the on-board reset button restart only the OTGW PIC,
   not the ESP. The MQTT session stays up and the broker still holds every
@@ -25,12 +25,12 @@ MsgID is seen on the OpenTherm bus after the ESP (re)starts, then the broker
   ESP restart (web UI **Reboot**, power cycle, OTA) is what re-runs the
   just-in-time cycle from scratch.
 - Some OT MsgIDs are answered by the boiler with **Unknown-Data-Id** (the
-  thermostat asks, this particular boiler does not implement it — e.g.
+  thermostat asks, this particular boiler does not implement it. E.g.
   `MaxRelModLevelSetting`, `Tr`, `ElectricalCurrentBurnerFlame`). No valid
   value is ever produced, so no entity is created. This is normal and is a
-  property of your boiler, not a firmware fault — you can simply ignore those.
+  property of your boiler, not a firmware fault. You can simply ignore those.
 
-**Do this, in order of effort — stop as soon as entities appear:**
+**Do this, in order of effort, stop as soon as entities appear:**
 
 1. **Wait ~5 minutes** with normal OT traffic after the last full ESP restart.
    Most active entities self-populate in that window as their MsgIDs are seen.
@@ -38,17 +38,17 @@ MsgID is seen on the OpenTherm bus after the ESP (re)starts, then the broker
    **Re-publish discovery** (or REST: `curl -X POST http://otgw.local/api/v2/discovery/republish`,
    or the Serial/telnet debug command **`F`**). This queues *every* known MsgID
    for discovery immediately; they then drip out over a few minutes. Safe to
-   repeat — the broker deduplicates identical retained configs, so no Home
+   repeat, the broker deduplicates identical retained configs, so no Home
    Assistant churn.
 3. **Clear the broker, then reboot.** If entities are still missing after
    step 2, the retained discovery state on the broker is likely corrupt or was
    manually removed. Remove the retained topics by following the
-   **"Step 2 — Remove the stale retained topics"** section below, then restart
+   **"Step 2. Remove the stale retained topics"** section below, then restart
    the OTGW from the web UI (full ESP restart). The just-in-time cycle
    re-publishes everything fresh.
 
 If after all three steps an entity is still absent, it is almost certainly an
-Unknown-Data-Id MsgID (see Background) — that entity will not exist for your
+Unknown-Data-Id MsgID (see Background), that entity will not exist for your
 boiler and that is expected.
 
 ---
@@ -60,13 +60,13 @@ protocol called **MQTT discovery**: the firmware sends a configuration message t
 topic on your MQTT broker. Home Assistant reads that message and automatically creates the
 entity (sensor, switch, etc.).
 
-These discovery messages are **retained** on the broker — the broker remembers them and
+These discovery messages are **retained** on the broker. The broker remembers them and
 replays them to any new subscriber. This means HA re-learns all entities automatically after
 a restart.
 
 **The problem:** when you upgrade the firmware, the new version may use slightly different
 topic paths or entity names. The old retained discovery messages stay on the broker. Home
-Assistant now sees both the old and the new, and creates duplicate entities — sometimes
+Assistant now sees both the old and the new, and creates duplicate entities. Sometimes
 appending `_2` to distinguish them.
 
 **Common symptoms:**
@@ -79,7 +79,7 @@ firmware publish fresh ones.
 
 ---
 
-## Step 1 — Find your device's Unique ID
+## Step 1: Find your device's Unique ID
 
 Every OTGW device has a unique identifier (based on the ESP chip ID). You need this to
 locate your specific discovery topics on the broker.
@@ -87,7 +87,7 @@ locate your specific discovery topics on the broker.
 1. Open the OTGW web interface: go to `http://otgw.local` or `http://<your device IP>` in a browser.
 2. Click **Settings** in the top menu.
 3. Find the **MQTT** section.
-4. Look for the field labeled **Unique ID** — it will look something like `otgw-a1b2c3`.
+4. Look for the field labeled **Unique ID**: it will look something like `otgw-a1b2c3`.
 
 Write this value down. You will use it in all the steps below.
 
@@ -96,7 +96,7 @@ Write this value down. You will use it in all the steps below.
 
 ---
 
-## Step 2 — Remove the stale retained topics
+## Step 2: Remove the stale retained topics
 
 Choose the method that works best for you. **Method A (MQTT Explorer)** is the easiest for
 most users.
@@ -120,7 +120,7 @@ browse and delete retained messages. It runs on Windows, macOS, and Linux.
 2. Expand **`sensor`**, then look for a folder that matches your Unique ID
    (e.g. `otgw-a1b2c3`).
 3. Right-click that folder and choose **Delete retained messages** (the exact wording
-   may differ slightly by version — it is the option that sends an empty retained payload
+   may differ slightly by version, it is the option that sends an empty retained payload
    to all sub-topics).
 4. Repeat this for each of these four folders (if they exist):
    - `homeassistant` → `binary_sensor` → `<your Unique ID>`
@@ -128,7 +128,7 @@ browse and delete retained messages. It runs on Windows, macOS, and Linux.
    - `homeassistant` → `number` → `<your Unique ID>`
    - `homeassistant` → `sensor` → `<your Unique ID>`
 
-After deleting, the topics disappear from the tree — that is correct.
+After deleting, the topics disappear from the tree. That is correct.
 
 ---
 
@@ -196,10 +196,10 @@ done < stale_topics.txt
 
 ---
 
-## Step 3 — Let the firmware re-publish fresh discovery configs
+## Step 3: Let the firmware re-publish fresh discovery configs
 
 After you have removed the stale topics, the firmware will automatically publish fresh
-discovery configs the next time it connects to MQTT — usually within 1–2 minutes of
+discovery configs the next time it connects to MQTT. Usually within 1–2 minutes of
 the broker being available.
 
 To trigger it immediately without waiting:
@@ -208,7 +208,7 @@ To trigger it immediately without waiting:
 
 ---
 
-## Step 4 — Restart Home Assistant (if duplicates persist)
+## Step 4: Restart Home Assistant (if duplicates persist)
 
 Home Assistant caches known entities in its internal registry. If duplicate entities are
 still visible after the broker is clean and the firmware has re-published:

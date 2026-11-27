@@ -115,7 +115,7 @@ The upgrade to Arduino Core 3.1.2 changes the LittleFS partition size from 1 MB 
 
 **Upgrading from v1.3.x (Arduino Core 2.7.4):**
 
-If you flash only the firmware binary without flashing the filesystem binary, the OTGW will detect a stale 1 MB filesystem at the wrong partition offset. It will spend approximately 5 to 10 minutes reformatting the new 2 MB partition on first boot. During this time the device is unresponsive: the web UI is unreachable and MQTT stays offline. After the reformat completes, all settings are gone — MQTT broker, credentials, hostname, and every other setting resets to factory defaults. You must re-enter all settings manually after the first boot.
+If you flash only the firmware binary without flashing the filesystem binary, the OTGW will detect a stale 1 MB filesystem at the wrong partition offset. It will spend approximately 5 to 10 minutes reformatting the new 2 MB partition on first boot. During this time the device is unresponsive: the web UI is unreachable and MQTT stays offline. After the reformat completes, all settings are gone. MQTT broker, credentials, hostname, and every other setting resets to factory defaults. You must re-enter all settings manually after the first boot.
 
 **Upgrading from v1.4.x (already on Arduino Core 3.1.2):**
 
@@ -128,7 +128,7 @@ If you skip the filesystem flash, the OTGW can still read existing settings but 
 4. Hard-refresh the browser (Ctrl+F5) after flashing.
 
 **Recovery: if you already flashed in the wrong order (firmware before filesystem):**
-The device spends approximately 5 to 10 minutes reformatting the 2 MB partition on first boot. It is unresponsive during that time — the web UI is unreachable and MQTT stays offline. After the reformat, settings reset to factory defaults. Flash the filesystem binary once the device becomes responsive again, hard-refresh the browser, and re-enter your settings manually via the Web UI.
+The device spends approximately 5 to 10 minutes reformatting the 2 MB partition on first boot. It is unresponsive during that time. The web UI is unreachable and MQTT stays offline. After the reformat, settings reset to factory defaults. Flash the filesystem binary once the device becomes responsive again, hard-refresh the browser, and re-enter your settings manually via the Web UI.
 
 ### No other breaking changes
 
@@ -197,8 +197,8 @@ What changed in `v1.3.0` without breaking existing `v1.2.0` setups:
    - Typo `vh_tramfer_enble_nominal_ventlation_value` renamed to `vh_transfer_enable_nominal_ventilation_value`.
    - Typo `vh_rw_nominal_ventlation_value` renamed to `vh_rw_nominal_ventilation_value`.
    - `RelativeHumidity_hb_u8` & `RelativeHumidity_lb_u8` (formerly ID 38 misdecoded as `u8/u8`) is now `RelativeHumidity` publishing a v4.2 standard `f8.8` value.
-2. **Legacy IDs 50-55 and 58-69 (Auto Suppression):** For v4.x compliant systems (most common setups), OpenTherm IDs `50-55` and `58-69` are now strictly defined as reserved and suppressed by default in `AUTO` mode. IDs `56` (TdhwSet) and `57` (MaxTSet) are **not** suppressed — they are valid in OpenTherm v4.2.
-3. **Advanced `FanSpeed` translation:** Standard HA discovery no longer parses `FanSpeed` natively in `rpm` — it creates the dual entities `FanSpeed_setpoint_hz` and `FanSpeed_actual_hz` (`Hz`).
+2. **Legacy IDs 50-55 and 58-69 (Auto Suppression):** For v4.x compliant systems (most common setups), OpenTherm IDs `50-55` and `58-69` are now strictly defined as reserved and suppressed by default in `AUTO` mode. IDs `56` (TdhwSet) and `57` (MaxTSet) are **not** suppressed. They are valid in OpenTherm v4.2.
+3. **Advanced `FanSpeed` translation:** Standard HA discovery no longer parses `FanSpeed` natively in `rpm`: it creates the dual entities `FanSpeed_setpoint_hz` and `FanSpeed_actual_hz` (`Hz`).
 4. **Device Info Payload (`GET /api/.../device/info`):** Keys in the custom JSON body have been renamed.
    - `mode` or `gatewaymode` is now explicitly **`otgwmode`** (`ON`, `OFF` or `detecting`).
    - `wifiqualitytldr` is explicitly renamed to **`wifiquality_text`**.

@@ -42,7 +42,7 @@
 ## 3. Acceptance-criteria matrix
 
 Mark each row Pass / Fail / N/A. A row marked N/A must include a brief reason
-(e.g. "OTGW32 only — board under test is ESP8266"). Evidence cell must point
+(e.g. "OTGW32 only, board under test is ESP8266"). Evidence cell must point
 to a concrete artefact (telnet log path, screenshot file, MQTT topic dump,
 Discord message URL, REST capture). "Looked OK" is not evidence.
 
@@ -62,7 +62,7 @@ Discord message URL, REST capture). "Looked OK" is not evidence.
 | `AC-SAT-1` | Multi-zone SAT (if hardware supports): two SAT slaves both update | | MQTT capture of `<TopTopic>/sat/zone/<n>/state` for each zone over a heat cycle | Mark N/A if single-zone hardware |
 
 Add release-specific rows below this line as needed. Do not delete pre-filled
-rows — mark them N/A with a one-line reason instead, so the matrix shape
+rows, mark them N/A with a one-line reason instead, so the matrix shape
 stays comparable across releases.
 
 | `AC-CUSTOM-1` |  |  |  |  |
@@ -113,7 +113,7 @@ After a green sign-off, the project owner runs through these:
 
 Context and rationale:
 
-- ADR-080 (binding ADRs require CI gates) — hardware-only ACs are the residual
+- ADR-080 (binding ADRs require CI gates): hardware-only ACs are the residual
   set this template covers, since they cannot be expressed as a CI gate.
-- `.full-review/06-followup-plan.md` — origin of TASK-501 4B-M5 and the
+- `.full-review/06-followup-plan.md`: origin of TASK-501 4B-M5 and the
   broader release-discipline follow-up work.

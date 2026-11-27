@@ -10,7 +10,7 @@ boodschappen en het verversen van Home Assistant sensoren.
 ## Voor je begint: wat gaan we doen?
 
 Wanneer je nieuwe firmware op je OpenTherm Gateway zet, kan het gebeuren dat Home
-Assistant dubbele sensoren laat zien — bijvoorbeeld twee keer dezelfde
+Assistant dubbele sensoren laat zien, bijvoorbeeld twee keer dezelfde
 temperatuur, of namen die eindigen op `_2`. Dat komt omdat de oude "discovery"
 boodschappen nog op je MQTT broker staan opgeslagen.
 
@@ -34,7 +34,7 @@ Tijd: ongeveer 10 minuten. Geen voorkennis nodig.
 
 ---
 
-## Stap 1 — Zoek je OTGW Unique ID op
+## Stap 1: Zoek je OTGW Unique ID op
 
 Je OTGW heeft een unieke naam, zoiets als `otgw-a1b2c3`. Die heb je straks nodig
 om je apparaat in MQTT Explorer terug te vinden.
@@ -49,12 +49,12 @@ om je apparaat in MQTT Explorer terug te vinden.
 > Tip: laat dit tabblad open staan, je hebt het in Stap 6 nog een keer nodig.
 
 > Heb je de **HA prefix** veranderd van het standaard `homeassistant` naar iets
-> anders? Onthoud dan ook die waarde — overal waar hieronder `homeassistant`
+> anders? Onthoud dan ook die waarde, overal waar hieronder `homeassistant`
 > staat, gebruik je jouw eigen prefix.
 
 ---
 
-## Stap 2 — MQTT Explorer downloaden
+## Stap 2: MQTT Explorer downloaden
 
 MQTT Explorer is een gratis programma waarmee je makkelijk in je MQTT broker kunt
 kijken en boodschappen kunt verwijderen.
@@ -66,7 +66,7 @@ kijken en boodschappen kunt verwijderen.
 
 ---
 
-## Stap 3 — Verbinding maken met de MQTT broker
+## Stap 3: Verbinding maken met de MQTT broker
 
 1. Klik in MQTT Explorer op het **+** teken bovenaan om een nieuwe verbinding toe
    te voegen.
@@ -86,7 +86,7 @@ Aan de linkerkant verschijnt nu een boom met topics.
 
 ---
 
-## Stap 4 — Vind de discovery topics van je OTGW
+## Stap 4: Vind de discovery topics van je OTGW
 
 Aan de linkerkant zie je een lijst met topics in een boomstructuur.
 
@@ -96,11 +96,11 @@ Aan de linkerkant zie je een lijst met topics in een boomstructuur.
 3. Klap **`sensor`** uit.
 4. Zoek de map met jouw Unique ID (bijvoorbeeld `otgw-a1b2c3`).
 
-Heb je hem gevonden? Mooi — daar staan de oude discovery boodschappen.
+Heb je hem gevonden? Mooi, daar staan de oude discovery boodschappen.
 
 ---
 
-## Stap 5 — De oude topics verwijderen
+## Stap 5: De oude topics verwijderen
 
 Voor elk van deze mappen, als hij bestaat, doe je dezelfde actie:
 
@@ -112,7 +112,7 @@ Voor elk van deze mappen, als hij bestaat, doe je dezelfde actie:
 **Per map:**
 
 1. Klik met de **rechter** muisknop op de map met je Unique ID.
-2. Kies **Delete topic** (of **Delete retained messages** — de naam verschilt
+2. Kies **Delete topic** (of **Delete retained messages**: de naam verschilt
    per versie van MQTT Explorer).
 3. Bevestig de actie.
 
@@ -123,17 +123,17 @@ De map verdwijnt uit de boom. Dat is precies de bedoeling.
 
 ---
 
-## Stap 6 — De OTGW vragen om nieuwe discovery te sturen
+## Stap 6: De OTGW vragen om nieuwe discovery te sturen
 
 Nu de oude boodschappen weg zijn, vragen we de OTGW om frisse versies.
 
-**Optie 1 — via de webinterface (makkelijkst):**
+**Optie 1, via de webinterface (makkelijkst):**
 
 1. Ga terug naar je OTGW webinterface.
 2. Open het **MQTT** tabblad.
 3. Klik op de knop **Re-publish discovery**.
 
-**Optie 2 — gewoon even wachten:**
+**Optie 2, gewoon even wachten:**
 
 Doe je niets, dan stuurt de OTGW binnen 1 à 2 minuten vanzelf nieuwe discovery
 boodschappen.
@@ -143,18 +143,18 @@ Je ziet in MQTT Explorer dat de mappen onder
 
 ---
 
-## Stap 7 — Home Assistant sensoren verversen
+## Stap 7: Home Assistant sensoren verversen
 
 Home Assistant pakt de nieuwe discovery boodschappen meestal automatisch op.
 Soms blijven er oude sensoren hangen. Hieronder vier opties, van mild naar
-streng. Probeer ze in volgorde — vaak is A of B al genoeg.
+streng. Probeer ze in volgorde, vaak is A of B al genoeg.
 
-### Optie A — Even wachten (1 à 2 minuten)
+### Optie A: Even wachten (1 à 2 minuten)
 
 Open je Home Assistant dashboard en check of de OTGW sensoren weer kloppen. Vaak
 lossen ze zichzelf op.
 
-### Optie B — MQTT integratie herladen
+### Optie B: MQTT integratie herladen
 
 1. Open Home Assistant.
 2. Ga naar **Settings → Devices & Services**.
@@ -162,7 +162,7 @@ lossen ze zichzelf op.
 4. Klik op de drie puntjes rechtsboven op de MQTT kaart.
 5. Kies **Reload**.
 
-### Optie C — Eén specifieke sensor verwijderen
+### Optie C: Eén specifieke sensor verwijderen
 
 Zie je nog een dubbele sensor, bijvoorbeeld eentje met `_2` aan het eind?
 
@@ -178,7 +178,7 @@ Zie je nog een dubbele sensor, bijvoorbeeld eentje met `_2` aan het eind?
 > sensor toont een actuele waarde. Een spooksensor toont meestal `unavailable`,
 > `unknown`, of een hele oude waarde die niet meer verandert.
 
-### Optie D — Home Assistant herstarten (laatste redmiddel)
+### Optie D: Home Assistant herstarten (laatste redmiddel)
 
 Werkt geen van de bovenstaande? Een herstart helpt vrijwel altijd:
 
@@ -186,10 +186,10 @@ Werkt geen van de bovenstaande? Een herstart helpt vrijwel altijd:
 
 ---
 
-## Klaar — hoe weet je dat het gelukt is?
+## Klaar: hoe weet je dat het gelukt is?
 
 Open Home Assistant en bekijk je OTGW apparaat. Als je geen dubbele sensoren meer
-ziet, geen `_2` namen, en alle waardes kloppen — dan ben je klaar.
+ziet, geen `_2` namen, en alle waardes kloppen. Dan ben je klaar.
 
 ---
 
@@ -210,4 +210,4 @@ bericht:
 
 - Je firmware versie (te vinden onderaan de OTGW webinterface).
 - Bij welke stap het misgaat.
-- Een schermafbeelding van MQTT Explorer of Home Assistant — dat helpt enorm.
+- Een schermafbeelding van MQTT Explorer of Home Assistant: dat helpt enorm.

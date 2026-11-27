@@ -1,4 +1,4 @@
-# OT-Thing-OTGW32 Feature Parity — OTGW-firmware 2.0.0
+# OT-Thing-OTGW32 Feature Parity: OTGW-firmware 2.0.0
 
 **Audit date:** 2026-05-08  
 **Audit scope:** Full 5-domain comparison of OT-Thing-OTGW32 (Seegel Systeme) vs OTGW-firmware 2.0.0  
@@ -9,10 +9,10 @@
 ## How to read this document
 
 Each domain section lists:
-- **COVERED** — equivalent or better feature present in 2.0.0
-- **GAP** — feature in OT-Thing not yet in 2.0.0 (linked to backlog task)
-- **ADVANTAGE** — feature in 2.0.0 that OT-Thing does not have
-- **BOTH GAP** — absent in both projects
+- **COVERED**: equivalent or better feature present in 2.0.0
+- **GAP**: feature in OT-Thing not yet in 2.0.0 (linked to backlog task)
+- **ADVANTAGE**: feature in 2.0.0 that OT-Thing does not have
+- **BOTH GAP**: absent in both projects
 - **REMOVED**: OT-Thing feature that 2.0.0 had and dropped on purpose (TASK-1684)
 
 **Update 2026-11-07 (TASK-1684):** the OT-Thing standalone controller (fixed flow, heating curve, PI room compensation, CH hysteresis; TASK-183 and TASK-582) is intentionally removed from OT-Direct. SAT is the only temperature controller. In OT-Direct master mode without SAT and without a `CS=` override (an external `CS=` must be repeated within 60 s), no flow setpoint is written and CH enable is off. The rows below that describe the controller are history.
@@ -56,10 +56,10 @@ Each domain section lists:
 | DHW push emergency heating state machine | ADVANTAGE | Not in OT-Thing |
 | Flame ratio tracking (180-min window) | COVERED | Parity |
 | Thermostat disconnect + setback | COVERED | Parity (OTDirect adds more than OT-Thing) |
-| Ventilation polling interval | GAP — TASK-583 | OT-Thing: 10s when vent active; 2.0.0: 60s |
+| Ventilation polling interval | GAP: TASK-583 | OT-Thing: 10s when vent active; 2.0.0: 60s |
 | OTDirect hysteresis + CH suspension | REMOVED, TASK-1684 | Built in TASK-582, removed again: SAT is the only controller (SAT has its own cold-cutoff hysteresis) |
 | Room temperature low-pass filtering in PI loop | REMOVED, TASK-1684 | The OT-Direct PI loop is gone; SAT filters its own room temperature |
-| Ventilation override persistence | GAP — TASK-584 | OT-Thing persists; 2.0.0 runtime-only |
+| Ventilation override persistence | GAP: TASK-584 | OT-Thing persists; 2.0.0 runtime-only |
 
 ---
 
@@ -77,8 +77,8 @@ Each domain section lists:
 | Multi-zone / area control | ADVANTAGE | Not in OT-Thing |
 | BLE sensor roster (discovery, labels, forget) | ADVANTAGE | Not in OT-Thing |
 | REST API scope | ADVANTAGE | 2.0.0: 50+ endpoints; OT-Thing: 13 |
-| WiFi network scan REST + UI dropdown | GAP — TASK-585 | OT-Thing: /scan endpoint; 2.0.0: type SSID manually |
-| Heating curve marker system | GAP — TASK-586 | OT-Thing: calibration points on graph; 2.0.0: none |
+| WiFi network scan REST + UI dropdown | GAP: TASK-585 | OT-Thing: /scan endpoint; 2.0.0: type SSID manually |
+| Heating curve marker system | GAP: TASK-586 | OT-Thing: calibration points on graph; 2.0.0: none |
 | MQTT topic listing endpoint | GAP (minor) | OT-Thing: /topics; 2.0.0: not exposed |
 | Two-step OTA (check + install) | GAP (minor) | OT-Thing: GitHub API check; 2.0.0: manual upload |
 
@@ -100,7 +100,7 @@ Each domain section lists:
 | Modulation suppression + overshoot protection | ADVANTAGE | Not in OT-Thing |
 | Cycle tracking and classification | ADVANTAGE | Not in OT-Thing |
 | Solar gain compensation | ADVANTAGE | Not in OT-Thing |
-| Named DS18B20 → SAT area mapping | GAP — TASK-587 | Neither has UI; REST-only workaround in 2.0.0 |
+| Named DS18B20 → SAT area mapping | GAP: TASK-587 | Neither has UI; REST-only workaround in 2.0.0 |
 | Direct MQTT room-temp → OT bus (TC= injection) | BOTH GAP | Absent in both; requires explicit design decision |
 
 ---
@@ -120,8 +120,8 @@ Each domain section lists:
 | SAT settings (30+ fields) | ADVANTAGE | Not in OT-Thing |
 | Heap pressure diagnostics (8 metrics) | ADVANTAGE | Not in OT-Thing |
 | Discovery verify system | ADVANTAGE | Not in OT-Thing |
-| OLED UI (5-page display, button pagination, 30s timeout) | GAP — TASK-580 | OT-Thing: full OLED UI; 2.0.0: detects but does not display |
-| Dynamic Ethernet↔WiFi failover (5s polling) | GAP — TASK-581 | OT-Thing: runtime; 2.0.0: boot-time only |
+| OLED UI (5-page display, button pagination, 30s timeout) | GAP: TASK-580 | OT-Thing: full OLED UI; 2.0.0: detects but does not display |
+| Dynamic Ethernet↔WiFi failover (5s polling) | GAP: TASK-581 | OT-Thing: runtime; 2.0.0: boot-time only |
 | Auto firmware version check (GitHub API) | GAP (minor) | OT-Thing: built-in; 2.0.0: external checker required |
 | Heating curve config (exponent/gradient/offset, static) | REMOVED, TASK-1684 | OT-Thing: static curves; 2.0.0: SAT is the only controller (the OT-Direct curve settings were removed) |
 
@@ -133,7 +133,7 @@ Each domain section lists:
 
 | Task | Title | Priority |
 |------|-------|----------|
-| TASK-579 | feat(ui): highlight active heating curve — mute reference curves | medium |
+| TASK-579 | feat(ui): highlight active heating curve: mute reference curves | medium |
 | TASK-580 | feat(oled): implement OLED UI driver with multi-page display | medium |
 | TASK-581 | feat(network): dynamic Ethernet-to-WiFi failover at runtime | medium |
 | TASK-582 | feat(otdirect): add hysteresis and CH suspension logic to OTDirect (removed again by TASK-1684) | medium |
@@ -145,10 +145,10 @@ Each domain section lists:
 
 ### Items absent in both projects (not tracked as gaps)
 
-- **Direct MQTT room-temp → OT bus routing** — neither OT-Thing nor 2.0.0 forward
+- **Direct MQTT room-temp → OT bus routing**: neither OT-Thing nor 2.0.0 forward
   external room temperature directly as a TC= OpenTherm command. Requires an explicit
   design decision (ADR candidate) before implementing.
-- **Bypass/vent stubs** — `openBypass`, `autoBypass`, `freeVentEnable` are empty `case`
+- **Bypass/vent stubs**: `openBypass`, `autoBypass`, `freeVentEnable` are empty `case`
   blocks in OT-Thing's MQTT handler. Not implemented in either project.
 
 ---

@@ -3,7 +3,7 @@
 ## Overview
 
 The OTGW firmware can call an HTTP endpoint whenever a monitored OpenTherm status bit changes
-state. This makes it straightforward to trigger actions in other devices or services — turn a
+state. This makes it straightforward to trigger actions in other devices or services. Turn a
 Shelly relay on when the boiler starts, send state data to a local Home Assistant webhook, update
 an OpenHAB item, alert a Node-RED flow, and so on.
 
@@ -29,7 +29,7 @@ In Home Assistant, create an automation with a **Webhook** trigger (webhook ID `
 Access the received values in your action with `{{ trigger.json.state }}`,
 `{{ trigger.json.tboiler }}`, etc.
 
-Both URLs point to the same webhook — the `"state"` field in the payload tells HA whether
+Both URLs point to the same webhook, the `"state"` field in the payload tells HA whether
 heating turned on or off.
 
 ---
@@ -38,7 +38,7 @@ heating turned on or off.
 
 | Setting key          | Type   | Default            | Description                                   |
 |----------------------|--------|--------------------|-----------------------------------------------|
-| `WebhookEnabled`     | bool   | false              | Master switch — set to `true` to enable       |
+| `WebhookEnabled`     | bool   | false              | Master switch: set to `true` to enable       |
 | `WebhookURLon`       | string | (empty)            | URL called when trigger bit turns ON (max 100)|
 | `WebhookURLoff`      | string | (empty)            | URL called when trigger bit goes OFF (max 100)|
 | `WebhookTriggerBit`  | int    | 1                  | Status-flag bit index to watch (0–15)         |
@@ -63,7 +63,7 @@ The method is selected automatically based on whether `WebhookPayload` is config
 
 | `WebhookPayload` | Method | Content-Type header            |
 |------------------|--------|--------------------------------|
-| empty (default)  | GET    | —                              |
+| empty (default)  | GET    | - |
 | any string       | POST   | value of `WebhookContentType`  |
 
 `WebhookContentType` is ignored for GET requests.
@@ -90,7 +90,7 @@ OpenTherm values:
 
 Values are formatted with sensible precision (1 decimal for temperatures, 2 for pressure,
 0 for modulation). Booleans are lowercase JSON `true` / `false`. Unknown `{placeholders}`
-are passed through unchanged — useful for catching typos.
+are passed through unchanged, useful for catching typos.
 
 `{tr}` expands to the JSON literal `null` until a room temperature has actually been
 observed (`OTcurrentSystemState.Tr` starts as NaN, so a gateway without a thermostat
@@ -106,15 +106,15 @@ The trigger bit uses the same 16-bit `Statusflags` layout as the GPIO outputs fe
 
 | Bit    | Flag                               | Default use                     |
 |--------|------------------------------------|---------------------------------|
-| 0      | Slave fault indication             | —                               |
-| **1**  | **Slave CH mode (heating active)** | **Default — fires on CH on/off**|
-| 2      | Slave DHW mode (hot water active)  | —                               |
-| 3      | Slave flame status (burner on)     | —                               |
-| 4      | Slave cooling mode                 | —                               |
-| 5      | Slave CH2 mode                     | —                               |
-| 8      | Master CH enable                   | —                               |
-| 9      | Master DHW enable                  | —                               |
-| 10     | Master cooling enable              | —                               |
+| 0      | Slave fault indication             | - |
+| **1**  | **Slave CH mode (heating active)** | **Default: fires on CH on/off**|
+| 2      | Slave DHW mode (hot water active)  | - |
+| 3      | Slave flame status (burner on)     | - |
+| 4      | Slave cooling mode                 | - |
+| 5      | Slave CH2 mode                     | - |
+| 8      | Master CH enable                   | - |
+| 9      | Master DHW enable                  | - |
+| 10     | Master cooling enable              | - |
 
 Bit 1 (slave CH mode) is the default: it goes `ON` when the boiler is actively heating
 and `OFF` when it stops.
@@ -134,7 +134,7 @@ and `OFF` when it stops.
 
 Discord requires HTTPS and a public internet URL. Both are blocked by the local-only security
 policy (ADR-003/ADR-032): the device is a local-network appliance and BearSSL TLS would consume
-20–30 KB of heap (>50% of available RAM). Use a local relay — see the Discord example below.
+20–30 KB of heap (>50% of available RAM). Use a local relay. See the Discord example below.
 
 ---
 
@@ -144,15 +144,15 @@ For security the firmware only targets **local-network hosts** via plain `http:/
 
 **Allowed:**
 
-- `http://192.168.x.x/...` — RFC 1918 private range
-- `http://10.x.x.x/...` — RFC 1918 private range
-- `http://172.16.x.x/...` to `http://172.31.x.x/...` — RFC 1918 private range
-- `http://169.254.x.x/...` — link-local
-- `http://hostname.local/...` — local hostnames resolved via LAN DNS
+- `http://192.168.x.x/...`: RFC 1918 private range
+- `http://10.x.x.x/...`: RFC 1918 private range
+- `http://172.16.x.x/...` to `http://172.31.x.x/...`: RFC 1918 private range
+- `http://169.254.x.x/...`: link-local
+- `http://hostname.local/...`: local hostnames resolved via LAN DNS
 
 **Blocked:**
 
-- `https://...` — HTTPS is not supported (ADR-003: TLS memory cost)
+- `https://...`: HTTPS is not supported (ADR-003: TLS memory cost)
 - Public IPv4 addresses (non-RFC1918)
 - Loopback `127.x.x.x`
 
@@ -173,7 +173,7 @@ The test uses the same URL, payload, and Content-Type as a real trigger.
 
 ## Integration examples
 
-### Home Assistant — local webhook with boiler state data
+### Home Assistant: local webhook with boiler state data
 
 See [Quick start for Home Assistant](#quick-start-for-home-assistant) at the top.
 
@@ -197,7 +197,7 @@ action:
       message: "Boiler {{ trigger.json.state }}: {{ trigger.json.tboiler }}°C"
 ```
 
-### Shelly Gen1 — relay follows CH mode
+### Shelly Gen1: relay follows CH mode
 
 ```
 WebhookEnabled    : true
@@ -207,7 +207,7 @@ WebhookURLoff     : http://192.168.1.10/relay/0?turn=off
 WebhookPayload    : (empty)
 ```
 
-### Shelly Gen2 — relay via RPC
+### Shelly Gen2: relay via RPC
 
 ```
 WebhookEnabled    : true
@@ -217,7 +217,7 @@ WebhookURLoff     : http://shelly-plus.local/rpc/Switch.Set?id=0&on=false
 WebhookPayload    : (empty)
 ```
 
-### OpenHAB — update an item state
+### OpenHAB: update an item state
 
 OpenHAB's REST API accepts plain-text commands, not JSON. Set `WebhookContentType` to
 `text/plain` and use `{state}` as the entire payload (it expands to `ON` or `OFF`, which
@@ -235,7 +235,7 @@ WebhookContentType  : text/plain
 To also push the boiler temperature to a Number item, point a second webhook at
 `http://openhab.local:8080/rest/items/BoilerTemperature` with payload `{tboiler}`.
 
-### Domoticz — switch a virtual device
+### Domoticz: switch a virtual device
 
 ```
 WebhookEnabled    : true
@@ -247,7 +247,7 @@ WebhookPayload    : (empty)
 
 Replace `idx=5` with your device index from the Domoticz device list.
 
-### Node-RED — all boiler data on flame-state change
+### Node-RED: all boiler data on flame-state change
 
 ```
 WebhookEnabled      : true
@@ -263,7 +263,7 @@ WebhookContentType  : application/json
 Discord requires HTTPS and a public internet URL, which the firmware cannot call directly.
 Use a local Node-RED flow or Home Assistant automation as a relay.
 
-**Node-RED** — receive the OTGW webhook, forward to Discord:
+**Node-RED**: receive the OTGW webhook, forward to Discord:
 
 ```
 [HTTP in]  POST /otgw/discord
@@ -280,5 +280,5 @@ WebhookPayload     : {"state":"{state}","tboiler":{tboiler},"tr":{tr}}
 WebhookContentType : application/json
 ```
 
-**Home Assistant** — use a webhook automation that sends a Discord notification via the
+**Home Assistant**: use a webhook automation that sends a Discord notification via the
 HA Discord integration (`notify.discord`).

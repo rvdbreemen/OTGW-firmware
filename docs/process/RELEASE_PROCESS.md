@@ -4,15 +4,15 @@ This document describes the complete end-to-end release process for OTGW-firmwar
 
 ---
 
-## Phase 0: Prepare — clean state & detect previous release
+## Phase 0: Prepare: clean state & detect previous release
 
 Start every release by ensuring a clean working state and detecting the baseline.
 
 1. **Ensure you are on `dev`**: `git checkout dev`
 2. **Commit and push any uncommitted changes**:
-   - `git status` — if there are modified or untracked files, stage, commit, and push them.
-   - `git pull` — incorporate any remote changes.
-   - `git push origin dev` — ensure local and remote are in sync.
+   - `git status`: if there are modified or untracked files, stage, commit, and push them.
+   - `git pull`: incorporate any remote changes.
+   - `git push origin dev`: ensure local and remote are in sync.
    - Verify: `git status` must show `nothing to commit, working tree clean`.
 3. **Detect the latest GitHub release** (this is the authoritative previous release, not a local git tag):
    ```bash
@@ -30,7 +30,7 @@ Start every release by ensuring a clean working state and detecting the baseline
 Check whether any architectural changes since the previous release require new or updated ADRs.
 
 1. Review the code commits from Phase 0 step 5.
-2. For each significant change — does it affect: architecture, NFRs (security/performance/availability), API contracts, new/replaced dependencies, or build/CI tooling?
+2. For each significant change, does it affect: architecture, NFRs (security/performance/availability), API contracts, new/replaced dependencies, or build/CI tooling?
 3. Check `docs/adr/` for existing ADRs that may need their Related section updated.
 4. If new ADRs are needed, create them now on `dev` before proceeding.
 
@@ -52,7 +52,7 @@ Before starting the release, ensure `dev` is in a releasable state.
 ## Phase 3: Merge dev to main
 
 1. `git checkout main && git pull origin main`
-2. `git merge dev` — resolve conflicts if any (prefer dev for version.h).
+2. `git merge dev`: resolve conflicts if any (prefer dev for version.h).
 3. Commit merge and push to remote.
 
 ---
@@ -76,7 +76,7 @@ Gather contributors from GitHub (closed issues, merged PRs) and Discord (`#beta-
 
 Create or update the following files on `main`.
 
-### 1. Full release notes — `RELEASE_NOTES_<version>.md`
+### 1. Full release notes: `RELEASE_NOTES_<version>.md`
 
 Create in the repository root. The current release notes file always lives at the root; previous release notes are archived in `docs/releases/` (see Phase 7 step 9). Structure:
 
@@ -90,7 +90,7 @@ Create in the repository root. The current release notes file always lives at th
 ## Bug fixes (bulleted, specific)
 ## New features (if any)
 ## Internal improvements (if any)
-## Breaking changes (explicit — or "No breaking changes vs v<prev>")
+## Breaking changes (explicit: or "No breaking changes vs v<prev>")
 ## Upgrade notes
 ```
 
@@ -100,14 +100,14 @@ Categorize changes into:
 - **Internal Improvements**: refactors, memory optimizations, code quality
 - **Breaking Changes**: MQTT topic renames, API removals, settings format changes. Always declare explicitly even if there are none.
 
-### 2. GitHub release message — `RELEASE_GITHUB_<version>.md`
+### 2. GitHub release message: `RELEASE_GITHUB_<version>.md`
 
 Create in the repository root. This is the concise version pasted into the GitHub Release UI. Previous versions are archived in `docs/releases/` alongside the full release notes (see Phase 7 step 9).
 
 - One-line summary at the top
 - Links to full release notes, README, and API docs
 - Bulleted sections: Bug fixes, Improvements, Upgrade notes
-- Keep it punchy — avoid deep technical refactors unless they affect stability
+- Keep it punchy: avoid deep technical refactors unless they affect stability
 - End with a **Thank You** section and Discord link (see below)
 
 #### Community acknowledgments (Thank You section)
@@ -139,9 +139,9 @@ Format:
 Special shoutout to **@most-active-contributor** for <specific contribution that made the biggest impact this release>!
 
 Thanks to everyone who contributed to this release through bug reports, testing, and feedback:
-- **@github-user** — reported the CS override issue with detailed logs
-- **username** (Discord) — tested beta builds and confirmed the fix
-- **username** (Discord) — provided diagnostic insights that helped identify the root cause
+- **@github-user**: reported the CS override issue with detailed logs
+- **username** (Discord): tested beta builds and confirmed the fix
+- **username** (Discord): provided diagnostic insights that helped identify the root cause
 
 Community members on [Discord](https://discord.gg/zjW3ju7vGQ) who helped diagnose and verify.
 
@@ -154,7 +154,7 @@ Join us on [Discord](https://discord.gg/zjW3ju7vGQ) for support and discussion.
 
 When no specific individuals can be identified, still include a general thank you to the community and Discord.
 
-### 3. Breaking changes log — `docs/BREAKING_CHANGES.md`
+### 3. Breaking changes log: `docs/BREAKING_CHANGES.md`
 
 Prepend a new section at the **top** of the existing log:
 
@@ -192,7 +192,7 @@ Run through every item below before creating the GitHub release.
 
 ### Version strings
 
-- [ ] `src/OTGW-firmware/version.h` — `_VERSION_PRERELEASE` is **commented out** (no `-beta`, `-rc`)
+- [ ] `src/OTGW-firmware/version.h`: `_VERSION_PRERELEASE` is **commented out** (no `-beta`, `-rc`)
 - [ ] `_SEMVER_FULL`, `_SEMVER_NOBUILD`, `_VERSION` contain no pre-release suffix
 - [ ] File header comments show the correct version (`python build.py` runs `autoinc-semver.py` to propagate)
 
@@ -246,9 +246,9 @@ Once the checklist is complete:
 
    Update links in `README.md` version history table to point to `docs/releases/` for the archived files. Commit with message: `docs: archive v<prev> release notes to docs/releases/`.
 
-3. **Remove pre-release from `version.h`** — Comment out `_VERSION_PRERELEASE` (or remove the `beta`/`rc` suffix) so the firmware version string is a clean `v<version>` without any pre-release tag. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
+3. **Remove pre-release from `version.h`**: Comment out `_VERSION_PRERELEASE` (or remove the `beta`/`rc` suffix) so the firmware version string is a clean `v<version>` without any pre-release tag. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
 
-4. **Run `python build.py --target all`** — This runs `autoinc-semver.py` internally (increments build number, updates version strings across all files) and builds firmware + filesystem. Verify the build succeeds.
+4. **Run `python build.py --target all`**: This runs `autoinc-semver.py` internally (increments build number, updates version strings across all files) and builds firmware + filesystem. Verify the build succeeds.
 
 5. **Commit the release build** on `main` and push to remote.
 
@@ -259,7 +259,7 @@ Once the checklist is complete:
    Examples: `v1.3.2 — File Explorer Reliability Fix`, `v1.4.0 — REST API v3 & Prometheus`, `v1.3.1 — Command Queue & CS Override Fix`.
 
    ```bash
-   gh release create v<version> --target main --title "v<version> — <Short Title>" --notes-file RELEASE_GITHUB_<version>.md --draft
+   gh release create v<version> --target main --title "v<version>. <Short Title>" --notes-file RELEASE_GITHUB_<version>.md --draft
    ```
 
    This creates the `v<version>` tag on the latest `main` commit and a draft release. The release is not yet visible to the public.
@@ -284,7 +284,7 @@ Once the checklist is complete:
    gh release edit v<version> --draft=false --latest
    ```
 
-   This makes the release public and marks it as the latest release. Once published, the release is immutable — assets can no longer be changed.
+   This makes the release public and marks it as the latest release. Once published, the release is immutable. Assets can no longer be changed.
 
 ---
 
@@ -298,7 +298,7 @@ Once the checklist is complete:
 
 Post release announcements in both community channels via the OTGW bot (`mcp__discord__discord_send`).
 
-**Dutch — `#nederlandse-ondersteuning`** (channel ID: `815561033036333076`):
+**Dutch, `#nederlandse-ondersteuning`** (channel ID: `815561033036333076`):
 
 ```text
 **OTGW-firmware v<version> is beschikbaar!**
@@ -310,7 +310,7 @@ Special shoutout naar **<contributor>** voor <bijdrage>!
 Download: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v<tag>
 ```
 
-**English — `#english-support`** (channel ID: `931267109726593116`):
+**English, `#english-support`** (channel ID: `931267109726593116`):
 
 ```text
 **OTGW-firmware v<version> is now available!**
@@ -366,7 +366,7 @@ This project follows [Semantic Versioning](https://semver.org/):
 | **Pre-release** | `beta` during development; commented out for stable releases |
 | **Build** | Auto-incremented by `build.py` on every build; not user-controlled |
 
-Version strings are generated by `scripts/autoinc-semver.py` (called by `build.py`) from `version.h`. Do not edit derived macros (`_SEMVER_FULL`, `_SEMVER_NOBUILD`, `_VERSION`) by hand — they are overwritten by `build.py`. Edit only `_VERSION_MAJOR`, `_VERSION_MINOR`, `_VERSION_PATCH`, and `_VERSION_PRERELEASE`.
+Version strings are generated by `scripts/autoinc-semver.py` (called by `build.py`) from `version.h`. Do not edit derived macros (`_SEMVER_FULL`, `_SEMVER_NOBUILD`, `_VERSION`) by hand. They are overwritten by `build.py`. Edit only `_VERSION_MAJOR`, `_VERSION_MINOR`, `_VERSION_PATCH`, and `_VERSION_PRERELEASE`.
 
 ---
 
@@ -374,11 +374,11 @@ Version strings are generated by `scripts/autoinc-semver.py` (called by `build.p
 
 | File | Purpose |
 |------|---------|
-| `src/OTGW-firmware/version.h` | Authoritative version — edit manually for major/minor/patch and pre-release |
+| `src/OTGW-firmware/version.h` | Authoritative version: edit manually for major/minor/patch and pre-release |
 | `scripts/autoinc-semver.py` | Auto-increments build, updates timestamps, propagates to file headers |
 | `RELEASE_NOTES_<version>.md` | Full detailed release notes for the **current** release (root, linked from README) |
 | `RELEASE_GITHUB_<version>.md` | Concise release body for GitHub release UI (root, **current** release only) |
 | `docs/releases/` | Archive of all previous release notes and GitHub release files |
 | `docs/BREAKING_CHANGES.md` | Cumulative breaking changes log across all versions |
-| `README.md` | Project readme — feature highlights, MQTT/HA setup, links to release notes |
-| `docs/adr/` | Architecture Decision Records — check for new/updated ADRs per release |
+| `README.md` | Project readme: feature highlights, MQTT/HA setup, links to release notes |
+| `docs/adr/` | Architecture Decision Records: check for new/updated ADRs per release |

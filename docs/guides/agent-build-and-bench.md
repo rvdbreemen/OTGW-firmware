@@ -10,7 +10,7 @@ Split out of CLAUDE.md by TASK-1631. CLAUDE.md keeps the hard rules in short for
 
 The alpha-tag publishing protocol lives in `.claude/rules/discord.md` (always loaded).
 
-**ALWAYS use the `.bat`/`.sh` wrappers — they are the only sanctioned CI/agent entrypoints.** On Windows use `build.bat`; on macOS/Linux use `./build.sh`. The wrapper bootstraps a correct Python venv **and downloads the full PlatformIO toolchain** if missing, so it works on any host. **NEVER invoke `python build.py` or `python flash_esp.py` directly** (maintainer directive, 2026-07-05): the host default Python is often 3.14, which the espressif32 platform rejects (needs 3.10–3.13), and `build.py` masks that failure with a lying exit 0 — leaving a stale `littlefs.bin` while claiming success. `build.bat`/`build.sh` are the entrypoints; `flash_otgw.bat` (not `flash_esp.py`) is the flash entrypoint. The `python build.py ...` forms below document what the wrapper runs underneath — invoke them directly only if the wrapper itself is genuinely unavailable, and then verify the output SUCCESS line + `firmware.bin`/`littlefs.bin` freshness by hand.
+**ALWAYS use the `.bat`/`.sh` wrappers (they are the only sanctioned CI/agent entrypoints.** On Windows use `build.bat`; on macOS/Linux use `./build.sh`. The wrapper bootstraps a correct Python venv **and downloads the full PlatformIO toolchain** if missing, so it works on any host. **NEVER invoke `python build.py` or `python flash_esp.py` directly** (maintainer directive, 2026-07-05): the host default Python is often 3.14, which the espressif32 platform rejects (needs 3.10–3.13), and `build.py` masks that failure with a lying exit 0) leaving a stale `littlefs.bin` while claiming success. `build.bat`/`build.sh` are the entrypoints; `flash_otgw.bat` (not `flash_esp.py`) is the flash entrypoint. The `python build.py ...` forms below document what the wrapper runs underneath, invoke them directly only if the wrapper itself is genuinely unavailable, and then verify the output SUCCESS line + `firmware.bin`/`littlefs.bin` freshness by hand.
 
 ```bash
 ./build.sh                   # Preferred — firmware + filesystem (handles venv)
@@ -43,7 +43,7 @@ Build targets on `dev` (`build.py --target` choices; ESP8266 exists only on `otg
 
 Asset naming: `OTGW-firmware-<token>-<semver>+<githash>-flash.zip` (plus
 `.ino.bin`, `.littlefs.bin`, merged bins and `.elf`). Never run two builds
-concurrently in one worktree — shared `.pio/build/` corrupts (bug-034 class);
+concurrently in one worktree, shared `.pio/build/` corrupts (bug-034 class);
 wipe the affected `.pio/build/<env>` dir and rebuild solo to recover.
 
 ## Test automation (on-device / soak)
@@ -52,7 +52,7 @@ End-to-end loop for firmware changes that need on-device validation (e.g. the
 heap-frag soak, TASK-934):
 
 - **Build (canonical):** `build.bat` / `./build.sh` (no `--target`: the default is `esp32-combo`, the one image built, benched and posted on `dev`; `--target esp32` builds a separate OTGW32-only image, see `BUILD.md`)
-  (a bare wrapper builds esp32-combo only) — builds firmware + filesystem and
+  (a bare wrapper builds esp32-combo only). Builds firmware + filesystem and
   bootstraps its own venv, so it is immune to the host Python version.
 - **Build (direct pio) gotcha:** `python -m platformio run -e esp32` fails if the
   host Python is 3.14+ (the espressif32 platform requires 3.10–3.13: *"Python
@@ -60,11 +60,11 @@ heap-frag soak, TASK-934):
   `~/.platformio/penv/Scripts/python.exe -m platformio run -e esp32`
   (firmware) and `... -e esp32 -t buildfs` (LittleFS).
 - **Fresh worktree:** run `git submodule update --init --recursive` before the
-  first build — git worktrees do NOT populate submodule working trees, so
+  first build, git worktrees do NOT populate submodule working trees, so
   `SimpleTelnet` (AsyncSimpleTelnet.h) and `OpenTherm` are missing otherwise and
   the sketch fails with *"No such file or directory"*.
 - **Static gates:** `python evaluate.py` (full) / `--quick`. Exit 0 = pass, 1 =
-  FAIL, 2 = WARN>5. NOT run by build.py — run it separately. Gate unit tests:
+  FAIL, 2 = WARN>5. NOT run by build.py, run it separately. Gate unit tests:
   `python tests/test_evaluate.py` (stdlib unittest, no pytest).
 - **Full test sweep:** `python scripts/run_tests.py` runs every `tests/test_*.py` AND every
   `test/host/test_*.py` (the MSVC harnesses that compile sliced firmware sources; Windows only,

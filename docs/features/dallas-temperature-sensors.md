@@ -31,7 +31,7 @@ Dallas sensors use the **OneWire** protocol, requiring only a single data line p
 
 #### Multiple sensors
 
-All sensors share the same bus — connect them in parallel to the same data line. Each sensor has a unique 64-bit address burned in at the factory, so they are individually addressable.
+All sensors share the same bus, connect them in parallel to the same data line. Each sensor has a unique 64-bit address burned in at the factory, so they are individually addressable.
 
 ```
   3.3V ──┬──────────┬──────────┬──
@@ -64,9 +64,9 @@ Configure Dallas sensors in the Web UI under **Settings**, or via the REST API a
 
 | Setting | JSON Key | Default | Description |
 |---|---|---|---|
-| GPIO Sensors Enabled | `GPIOSENSORSenabled` | `false` | Master switch — enables OneWire bus scanning and sensor polling |
+| GPIO Sensors Enabled | `GPIOSENSORSenabled` | `false` | Master switch: enables OneWire bus scanning and sensor polling |
 | GPIO pin # | `GPIOSENSORSpin` | `10` | GPIO pin for the OneWire data line (SD3 = GPIO10) |
-| GPIO Publish Interval | `GPIOSENSORSinterval` | `20` | Polling interval in seconds — how often sensors are read |
+| GPIO Publish Interval | `GPIOSENSORSinterval` | `20` | Polling interval in seconds: how often sensors are read |
 | GPIO Sensors Legacy Format | `GPIOSENSORSlegacyformat` | `false` | Use legacy (pre-v1.0) truncated sensor address format |
 
 ### Enabling sensors
@@ -118,7 +118,7 @@ For new installations, leave this setting **off** (default).
 
 Every `settingGPIOSENSORSinterval` seconds (default 20), the main loop calls `pollSensors()`:
 
-1. `sensors.requestTemperatures()` — sends a convert command to all sensors on the bus.
+1. `sensors.requestTemperatures()`: sends a convert command to all sensors on the bus.
 2. For each discovered sensor:
    - Read temperature via `sensors.getTempC(addr)`.
    - Store in `DallasrealDevice[i].tempC` and update timestamp.
@@ -136,7 +136,7 @@ Discovered sensors appear in the main OTmonitor table with their 16-character he
 Click on any Dallas sensor name in the OTmonitor table to open an **inline editor**:
 
 - A text input replaces the sensor name, pre-filled with the current label.
-- Type a custom name (max **16 characters**) — e.g., "Living Room" or "Boiler Return".
+- Type a custom name (max **16 characters**): e.g., "Living Room" or "Boiler Return".
 - Press **Enter** to save, or **Escape** to cancel.
 - Clicking away (blur) auto-saves if the label changed.
 - A pencil icon (✏️) indicates editable fields.
@@ -151,7 +151,7 @@ Labels are stored on the device filesystem in `/dallas_labels.ini` as a JSON obj
 }
 ```
 
-The file uses **zero backend RAM** — labels are streamed directly from LittleFS on read and written in one operation on save.
+The file uses **zero backend RAM**: labels are streamed directly from LittleFS on read and written in one operation on save.
 
 ### Labels REST API
 
@@ -175,7 +175,7 @@ Dallas sensors are **automatically added** to the real-time temperature graph (t
 
 When performing a **filesystem flash** (OTA update of the LittleFS partition), the Web UI:
 
-1. **Before flash**: Downloads both `settings.ini` and `dallas_labels.ini` as backup files to the user's browser (timestamped filenames). The labels backup is non-fatal — if the file doesn't exist, the flash proceeds normally.
+1. **Before flash**: Downloads both `settings.ini` and `dallas_labels.ini` as backup files to the user's browser (timestamped filenames). The labels backup is non-fatal. If the file doesn't exist, the flash proceeds normally.
 2. **After reboot**: The OTA completion page automatically **restores labels** from the parent window's in-memory cache (`dallasLabelsCache`) by POSTing them back to `/api/v1/sensors/labels`. This happens after a 5-second stabilization delay.
 
 > **Note:** `settings.ini` is auto-restored from ESP memory (it persists across filesystem flashes). Dallas labels require the active restore because they only exist on the filesystem.
@@ -236,7 +236,7 @@ Pressing `d` toggles `bDebugSensorSimulation` and calls `initSensors()` to immed
 - Temperatures **drift randomly** by ±0.5°C per update step (random walk).
 - Values are **clamped** to the range **20.0°C – 60.0°C**.
 - Updates occur every **10 seconds** (independent of the configured poll interval).
-- Sensors appear in the OTmonitor table, graph, and MQTT — identical to real hardware.
+- Sensors appear in the OTmonitor table, graph, and MQTT: identical to real hardware.
 - Debug logging for simulated sensors is gated behind the `bDebugSensors` flag (press `4` in telnet) to reduce telnet output.
 
 ### Simulation vs Real Sensors
@@ -247,7 +247,7 @@ Pressing `d` toggles `bDebugSensorSimulation` and calls `initSensors()` to immed
 | Sensors discovered | Auto-scan OneWire bus | 3 fixed virtual sensors |
 | Update interval | `GPIOSENSORSinterval` (default 20s) | Fixed 10 seconds |
 | Temperature source | `sensors.getTempC()` | Random walk ±0.5°C |
-| Requires reboot | Yes (for pin change) | No — instant toggle |
+| Requires reboot | Yes (for pin change) | No: instant toggle |
 | MQTT publishing | Yes | Yes |
 | Labels & graph | Yes | Yes |
 

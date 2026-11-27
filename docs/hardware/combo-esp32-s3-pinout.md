@@ -6,7 +6,7 @@
 > `esp32-classic` build (ADR-126) also remains. The historical mapping
 > rationale below is still valid.
 
-# Combo ESP32-S3 pinout — OTGW Classic (PIC) and OTGW32 (OTDirect)
+# Combo ESP32-S3 pinout: OTGW Classic (PIC) and OTGW32 (OTDirect)
 
 Reference pin map for the **combo board** (ADR-125): a single ESP32-S3 binary
 that runs on **either** an OTGW Classic PCB (Wemos D1-mini socket + PIC) **or**
@@ -22,7 +22,7 @@ Sources of truth:
   → `BOARD_NODOSHOP_ESP32`.
 - **S3 Mini ↔ D1 mini:** footprint compatibility (shield signals land on the
   same holes). Cross-checked: the reference design's W5500 `SCK/MISO/MOSI = 12/13/11`
-  equals the S3 Mini's SPI at the D1-mini D5/D6/D7 holes — an independent
+  equals the S3 Mini's SPI at the D1-mini D5/D6/D7 holes. An independent
   confirmation of the footprint mapping.
 
 ---
@@ -56,7 +56,7 @@ cross-checked against the Arduino core variant
 
 ---
 
-## 2. OTGW Classic — what the socket actually drives
+## 2. OTGW Classic: what the socket actually drives
 
 From dev `boards.h` (`BOARD_NODOSHOP_ESP8266`) + the hole each uses:
 
@@ -67,9 +67,9 @@ From dev `boards.h` (`BOARD_NODOSHOP_ESP8266`) + the hole each uses:
 | PIC serial TX (`PIN_PIC_TX`) | TX | 1 | **43** |
 | I2C SCL (watchdog 0x26 + OLED) | D1 | 5 | **36** |
 | I2C SDA | D2 | 4 | **35** |
-| Button | D3 | 0 | **18** (= OTGW32 I2C SDA — needs runtime gating if wired) |
-| LED1 | D4 | 2 | **16** (= OTGW32 W5500 RST — needs runtime gating if wired) |
-| LED2 | D0 | 16 | **4** (= OTGW32 1-Wire — needs runtime gating if wired) |
+| Button | D3 | 0 | **18** (= OTGW32 I2C SDA: needs runtime gating if wired) |
+| LED1 | D4 | 2 | **16** (= OTGW32 W5500 RST: needs runtime gating if wired) |
+| LED2 | D0 | 16 | **4** (= OTGW32 1-Wire: needs runtime gating if wired) |
 
 > Note: the Classic PCB also carries the external **0x26 I2C watchdog** on the
 > I2C bus. The ESP32 Task Watchdog is the primary watchdog; the combo also
@@ -120,8 +120,8 @@ so a GPIO shared between the two maps (e.g. **12** = W5500-SCK in OTDirect mode
 ### Conflict check (PIC mode pins vs OTGW32 map)
 PIC-mode pins 12/43/44/35/36 vs OTGW32 pins {0,1,2,4,6,7,8,9,10,11,13,14,15,16,
 17,18,21,47,48}:
-- **12** overlaps W5500-SCK — intentional, runtime-gated (different owner per mode).
-- **43, 44, 35, 36** do not overlap the OTGW32 map — distinct GPIOs, no contention.
+- **12** overlaps W5500-SCK: intentional, runtime-gated (different owner per mode).
+- **43, 44, 35, 36** do not overlap the OTGW32 map: distinct GPIOs, no contention.
 
 ---
 

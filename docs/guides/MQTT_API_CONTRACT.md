@@ -44,11 +44,11 @@ This is hardcoded in `Firmware/src/mqtt.cpp:72-74`. Users cannot configure a cus
 
 Source: `mqtt.cpp:80`
 
-### 1.3 State publish — the `/state` topic
+### 1.3 State publish: the `/state` topic
 
 **Topic:** `{baseTopic}/state`  
 **Interval:** Every 5 seconds  
-**Payload:** JSON document — the single authoritative state blob  
+**Payload:** JSON document, the single authoritative state blob  
 **Source:** `mqtt.cpp:159`, `devstatus.cpp:34-95`, `otcontrol.cpp:1034-1104`
 
 #### Full JSON schema
@@ -159,28 +159,28 @@ OT-Thing accepts commands on `{baseTopic}/{commandName}/set`. All payloads are p
 
 | Command topic | Payload format | Effect |
 |--------------|---------------|--------|
-| `{base}/outsideTemp/set` | `"<float>"` — °C | Sets outside temperature compensation |
-| `{base}/dwhSetTemp/set` | `"<float>"` — °C | Sets DHW setpoint |
-| `{base}/chSetTemp1/set` | `"<float>"` — °C | Sets CH circuit 1 setpoint |
-| `{base}/chSetTemp2/set` | `"<float>"` — °C | Sets CH circuit 2 setpoint |
+| `{base}/outsideTemp/set` | `"<float>"`: °C | Sets outside temperature compensation |
+| `{base}/dwhSetTemp/set` | `"<float>"`: °C | Sets DHW setpoint |
+| `{base}/chSetTemp1/set` | `"<float>"`: °C | Sets CH circuit 1 setpoint |
+| `{base}/chSetTemp2/set` | `"<float>"`: °C | Sets CH circuit 2 setpoint |
 | `{base}/dhwMode/set` | `"heat"` / `"auto"` / `"off"` | Sets DHW control mode |
 | `{base}/chMode1/set` | `"heat"` / `"auto"` / `"off"` | Sets CH circuit 1 mode |
 | `{base}/chMode2/set` | `"heat"` / `"auto"` / `"off"` | Sets CH circuit 2 mode |
-| `{base}/roomTemp1/set` | `"<float>"` — °C | Injects measured room temperature |
-| `{base}/roomTemp2/set` | `"<float>"` — °C | Injects circuit 2 room temperature |
-| `{base}/roomSetpoint1/set` | `"<float>"` — °C | Sets room setpoint for circuit 1 |
-| `{base}/roomSetpoint2/set` | `"<float>"` — °C | Sets room setpoint for circuit 2 |
+| `{base}/roomTemp1/set` | `"<float>"`: °C | Injects measured room temperature |
+| `{base}/roomTemp2/set` | `"<float>"`: °C | Injects circuit 2 room temperature |
+| `{base}/roomSetpoint1/set` | `"<float>"`: °C | Sets room setpoint for circuit 1 |
+| `{base}/roomSetpoint2/set` | `"<float>"`: °C | Sets room setpoint for circuit 2 |
 | `{base}/roomComp1/set` | `"heat"` / `"auto"` / `"off"` | Sets room compensation mode for circuit 1 |
 | `{base}/roomComp2/set` | `"heat"` / `"auto"` / `"off"` | Sets room compensation mode for circuit 2 |
 | `{base}/overrideCh1/set` | `"ON"` / `"OFF"` | Force CH circuit 1 on/off |
 | `{base}/overrideCh2/set` | `"ON"` / `"OFF"` | Force CH circuit 2 on/off |
 | `{base}/overrideDhw/set` | `"ON"` / `"OFF"` | Force DHW on/off |
-| `{base}/ventSetpoint/set` | `"<int>"` — 0..100 % | Sets ventilation setpoint |
+| `{base}/ventSetpoint/set` | `"<int>"`: 0..100 % | Sets ventilation setpoint |
 | `{base}/ventEnable/set` | `"ON"` / `"OFF"` | Enables/disables ventilation |
-| `{base}/maxModulation/set` | `"<int>"` — 0..100 % | Sets maximum modulation limit |
-| `{base}/openBypass/set` | (not implemented) | Stub — no handler |
-| `{base}/autoBypass/set` | (not implemented) | Stub — no handler |
-| `{base}/freeVentEnable/set` | (not implemented) | Stub — no handler |
+| `{base}/maxModulation/set` | `"<int>"`: 0..100 % | Sets maximum modulation limit |
+| `{base}/openBypass/set` | (not implemented) | Stub: no handler |
+| `{base}/autoBypass/set` | (not implemented) | Stub: no handler |
+| `{base}/freeVentEnable/set` | (not implemented) | Stub: no handler |
 
 Source: `mqtt.cpp:13-36` (topic name definitions), `mqtt.cpp:207-298` (handlers)
 
@@ -195,7 +195,7 @@ SAT supports 4 MQTT coordinator modes, each implementing a different gateway dia
 | `MQTT_OTTHING` | `SatOtthingMqttCoordinator` | OT-Thing firmware |
 | `MQTT_OPENTHERM` | `SatOpenThermMqttCoordinator` | OTGW (PIC), OTGW-firmware, OTGW-firmware 2.0.0 |
 | `MQTT_EMS` | `SatEmsMqttCoordinator` | EMS-ESP / Buderus/Bosch EMS bus |
-| `FAKE` | (coordinator.py) | Simulator — no MQTT |
+| `FAKE` | (coordinator.py) | Simulator: no MQTT |
 
 Source: `coordinator/entry_data.py:22-30`
 
@@ -250,8 +250,8 @@ SAT expects the following JSON structure in the payload (exact schema from test 
 | `DATA_DHW_SETPOINT` | `thermostat.dhw_set_t` | Thermostat's demanded DHW setpoint |
 | `DATA_REL_MOD_LEVEL` | `slave.rel_mod` | Current relative modulation |
 | `DATA_BOILER_CAPACITY` | `slave.max_capacity` | Max boiler capacity |
-| `DATA_REL_MIN_MOD_LEVEL` | `slave.maxModulation` | Max modulation setting (note: variable name is misleading — see §4.1) |
-| `DATA_MAX_REL_MOD_LEVEL_SETTING` | `slave.min_modulation` | Min modulation setting (note: variable name is misleading — see §4.1) |
+| `DATA_REL_MIN_MOD_LEVEL` | `slave.maxModulation` | Max modulation setting (note: variable name is misleading, see §4.1) |
+| `DATA_MAX_REL_MOD_LEVEL_SETTING` | `slave.min_modulation` | Min modulation setting (note: variable name is misleading, see §4.1) |
 | `DATA_DHW_SETPOINT_MINIMUM` | `slave.dhwMin` | Min DHW setpoint limit |
 | `DATA_DHW_SETPOINT_MAXIMUM` | `slave.dhwMax` | Max DHW setpoint limit |
 
@@ -266,7 +266,7 @@ SAT expects the following JSON structure in the payload (exact schema from test 
 
 Note: SAT does **not** use the `/set` suffix when publishing commands in `MQTT_OTTHING` mode. The topic is `{base}/chMode1`, not `{base}/chMode1/set`.
 
-> **Important:** OT-Thing subscribes to `{baseTopic}/+/set` (with `/set` suffix). SAT `MQTT_OTTHING` publishes to `{base}/{command}` (without `/set`). This is a **compatibility gap** — OT-Thing would not receive SAT's command messages without a MQTT topic bridge or firmware patch.
+> **Important:** OT-Thing subscribes to `{baseTopic}/+/set` (with `/set` suffix). SAT `MQTT_OTTHING` publishes to `{base}/{command}` (without `/set`). This is a **compatibility gap**: OT-Thing would not receive SAT's command messages without a MQTT topic bridge or firmware patch.
 
 Source: `coordinator/mqtt/__init__.py:134-149` (publish helper, QoS 1)
 
@@ -300,7 +300,7 @@ Subscribed keys (flat scalar values):
 
 Source: `coordinator/mqtt/opentherm.py:174-193`
 
-**Publish commands** — PIC-protocol command strings:  
+**Publish commands**: PIC-protocol command strings:  
 **Topic:** `{mqtt_topic}/set/{device_id}/command`  
 **Source:** `opentherm.py:232-233`
 
@@ -314,8 +314,8 @@ Source: `coordinator/mqtt/opentherm.py:174-193`
 | Set max setpoint | `SH={value}` | Sets maximum CH setpoint |
 
 **Boot sequence** sent once on connect (`opentherm.py:166-172`):
-- `PM=3`, `PM=15`, `PM=48` — request periodic OpenTherm data frames
-- `MI=500` — for Ideal, Intergas, Nefit boilers only
+- `PM=3`, `PM=15`, `PM=48`: request periodic OpenTherm data frames
+- `MI=500`: for Ideal, Intergas, Nefit boilers only
 
 ### 2.3 Mode: MQTT_EMS
 
@@ -345,15 +345,15 @@ OTGW/thermostat/TSet   → "20.00"
 OTGW/boiler/Tboiler    → "64.50"
 ```
 
-**Payload:** Always a plain scalar string — float (via `dtostrf`), integer (via `snprintf_P`), or named constant (`"ON"`, `"OFF"`, `"true"`, `"false"`, `"online"`, `"offline"`). Never JSON on value topics.
+**Payload:** Always a plain scalar string. Float (via `dtostrf`), integer (via `snprintf_P`), or named constant (`"ON"`, `"OFF"`, `"true"`, `"false"`, `"online"`, `"offline"`). Never JSON on value topics.
 
 ### 3.2 HA auto-discovery
 
 OTGW-firmware 2.0.0 publishes rich HA auto-discovery payloads on `homeassistant/` topics separately from value topics:
 
-- `homeassistant/sensor/{nodeId}/{sensorId}/config` — JSON, metadata only
-- `homeassistant/binary_sensor/{nodeId}/{sensorId}/config` — JSON, metadata only
-- `homeassistant/switch/{nodeId}/{sensorId}/config` — JSON, metadata only
+- `homeassistant/sensor/{nodeId}/{sensorId}/config`: JSON, metadata only
+- `homeassistant/binary_sensor/{nodeId}/{sensorId}/config`: JSON, metadata only
+- `homeassistant/switch/{nodeId}/{sensorId}/config`: JSON, metadata only
 - etc.
 
 Each config payload points `state_topic` at the corresponding flat value topic. The value topic itself carries only the scalar.
@@ -362,19 +362,19 @@ Source: `MQTTHaDiscovery.cpp` (streaming discovery publisher), ADR-077, ADR-101
 
 ### 3.3 SAT `json_attributes_topic` topics (exceptions to ADR-101)
 
-A small number of topics in `SATcontrol.ino` carry JSON payloads. These are `json_attributes_topic` entries — not value topics — used to expose PID internals as HA entity attributes. They are legitimate ADR-101 exceptions because:
+A small number of topics in `SATcontrol.ino` carry JSON payloads. These are `json_attributes_topic` entries (not value topics) used to expose PID internals as HA entity attributes. They are legitimate ADR-101 exceptions because:
 
 1. They are registered in the HA discovery system as `json_attributes_topic` (not `state_topic`)
 2. HA treats them as supplementary attribute blobs, not sensor state
 
 Wired exceptions (discovery registered):
-- `sat/pid_attributes` — PID error, P, I, D components (`SATcontrol.ino:1887-1890`)
-- `sat/cycle_attributes` — Cycle classification metadata (`SATcontrol.ino:1917-1926`)
+- `sat/pid_attributes`: PID error, P, I, D components (`SATcontrol.ino:1887-1890`)
+- `sat/cycle_attributes`: Cycle classification metadata (`SATcontrol.ino:1917-1926`)
 
-Unwired exceptions (see §4 — need attention):
-- `sat/curve_recommendation_attributes` — `SATcontrol.ino:2083-2090`
-- `sat/climate_attributes` — `SATcontrol.ino:2451-2526`
-- `sat/pressure_health_attr` — `SATcontrol.ino:2042-2062`
+Unwired exceptions (see §4, need attention):
+- `sat/curve_recommendation_attributes`: `SATcontrol.ino:2083-2090`
+- `sat/climate_attributes`: `SATcontrol.ino:2451-2526`
+- `sat/pressure_health_attr`: `SATcontrol.ino:2042-2062`
 
 ### 3.4 Command subscribe contract
 
@@ -398,8 +398,8 @@ Source: `MQTTstuff.ino` (MQTT subscribe handler)
 
 | SAT mode | Compatible gateway | Works with OTGW-firmware 2.0.0? | Works with OT-Thing? |
 |----------|-------------------|--------------------------------|---------------------|
-| `MQTT_OTTHING` | OT-Thing firmware | **No** — 2.0.0 does not publish nested JSON state | **Yes*** (see gap below) |
-| `MQTT_OPENTHERM` | OTGW, OTGW-firmware, OTGW-firmware 2.0.0 | **Yes** — full dialect match | **No** — OT-Thing does not speak flat scalar topics |
+| `MQTT_OTTHING` | OT-Thing firmware | **No**: 2.0.0 does not publish nested JSON state | **Yes*** (see gap below) |
+| `MQTT_OPENTHERM` | OTGW, OTGW-firmware, OTGW-firmware 2.0.0 | **Yes** (full dialect match | **No**) OT-Thing does not speak flat scalar topics |
 | `MQTT_EMS` | EMS-bus gateways | No | No |
 
 *SAT `MQTT_OTTHING` vs OT-Thing topic suffix gap: SAT publishes commands to `{base}/chMode1` but OT-Thing subscribes to `{base}/chMode1/set`. The state subscription (`{base}/state`) matches. Status reads work; commands don't reach OT-Thing without a bridge or patch.
@@ -408,7 +408,7 @@ Source: `MQTTstuff.ino` (MQTT subscribe handler)
 
 | SAT expects | OT-Thing publishes | Match |
 |------------|-------------------|-------|
-| `slave.flow_t` | `slave.flow_t` or `slave.Tboiler` (alias) | Partial — depends on OT-Thing firmware version |
+| `slave.flow_t` | `slave.flow_t` or `slave.Tboiler` (alias) | Partial: depends on OT-Thing firmware version |
 | `slave.return_t` | `slave.return_t` or `slave.Tret` | Partial |
 | `slave.status.flame` | `slave.status.flame` | Match |
 | `slave.status.ch_mode` | `slave.status.ch_mode` | Match |
@@ -471,9 +471,9 @@ The critical step: change SAT coordinator mode from `MQTT_OTTHING` to `MQTT_OPEN
 
 | Issue | Severity | Status |
 |-------|---------|--------|
-| `sat/curve_recommendation_attributes` published but no HA discovery entry | Medium | Open — orphaned MQTT traffic |
-| `sat/climate_attributes` 512-byte static buffer, no HA discovery entry | High | Open — static RAM consumption + orphaned traffic |
-| `sat/pressure_health_attr` published but no HA discovery entry | Medium | Open — orphaned MQTT traffic |
+| `sat/curve_recommendation_attributes` published but no HA discovery entry | Medium | Open: orphaned MQTT traffic |
+| `sat/climate_attributes` 512-byte static buffer, no HA discovery entry | High | Open: static RAM consumption + orphaned traffic |
+| `sat/pressure_health_attr` published but no HA discovery entry | Medium | Open: orphaned MQTT traffic |
 | SAT `MQTT_OTTHING` command topic suffix mismatch vs OT-Thing `/set` convention | Medium | Not a 2.0.0 concern (different dialect) |
 | SAT `DATA_REL_MIN_MOD_LEVEL` / `DATA_MAX_REL_MOD_LEVEL_SETTING` name swap | Low | SAT-internal bug; behavior correct |
 
@@ -481,7 +481,7 @@ The critical step: change SAT coordinator mode from `MQTT_OTTHING` to `MQTT_OPEN
 
 ## References
 
-- ADR-101: `docs/adr/ADR-101-flat-per-value-mqtt-topics-over-aggregated-json-payloads.md` — binding decision: OTGW-firmware uses flat topics only
+- ADR-101: `docs/adr/ADR-101-flat-per-value-mqtt-topics-over-aggregated-json-payloads.md`: binding decision: OTGW-firmware uses flat topics only
 - ADR-077: Streaming MQTT HA Discovery Architecture
 - ADR-096: MQTT Source-Subtopic Worldview Semantics
 - OT-Thing firmware source: `other-projects/OT-Thing-OTGW32/Firmware/src/mqtt.cpp`

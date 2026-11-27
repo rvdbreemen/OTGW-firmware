@@ -21,7 +21,7 @@ OTGW/
     otgw-1020BA16C6BC ...
 ```
 
-The `otthing/<chipid>/*` entries look live — payloads are present and they sit alongside the new `OTGW/...` topics — so it appears the device is sending duplicate, outdated data on a deprecated prefix.
+The `otthing/<chipid>/*` entries look live (payloads are present and they sit alongside the new `OTGW/...` topics) so it appears the device is sending duplicate, outdated data on a deprecated prefix.
 
 ## The Diagnosis
 
@@ -42,7 +42,7 @@ This is broker-side state, not firmware-side state. Reflashing OTGW32 again does
 
 Pick whichever path matches your tooling. All three publish empty retained payloads to each `otthing/...` topic, which is the MQTT-standard way to delete a retained message.
 
-### Option 1 — `mosquitto_pub` / `mosquitto_sub` (shell)
+### Option 1: `mosquitto_pub` / `mosquitto_sub` (shell)
 
 If the broker is mosquitto and you have `mosquitto_pub` / `mosquitto_sub` installed:
 
@@ -60,17 +60,17 @@ What each part does:
 
 Add `-u <user> -P <pass>` to both `mosquitto_pub` and `mosquitto_sub` if your broker requires authentication.
 
-### Option 2 — MQTT Explorer (cross-platform GUI, recommended for non-technical testers)
+### Option 2: MQTT Explorer (cross-platform GUI, recommended for non-technical testers)
 
 [MQTT Explorer](https://mqtt-explorer.com/) is the simplest path:
 
 1. Connect to your broker.
 2. Find the `otthing` node in the topic tree on the left.
-3. Right-click it and choose **Delete topic** (or the equivalent — the menu wording varies by version).
+3. Right-click it and choose **Delete topic** (or the equivalent, the menu wording varies by version).
 
 MQTT Explorer walks the subtree and publishes empty retained messages to every leaf for you. The whole `otthing/` branch disappears once it is done.
 
-### Option 3 — Home Assistant MQTT integration
+### Option 3: Home Assistant MQTT integration
 
 If Home Assistant is connected to your broker:
 
@@ -84,14 +84,14 @@ This is the slowest option because it is one topic at a time, but it works witho
 
 This guide is the recommended path because the cleanup is intentionally not handled by the firmware.
 
-- The cleanup is a one-shot per device — once the broker is clean, it stays clean.
+- The cleanup is a one-shot per device: once the broker is clean, it stays clean.
 - Broker-side tooling (MQTT Explorer, mosquitto CLI, HA) already does this job well, without needing the device.
 - Adding a firmware block that subscribes to a deprecated topic prefix at every boot is more permanent surface area than a one-time housekeeping issue warrants. Maintainer decision (TASK-570, 2026-05-07).
 
-If you are coming from OTTHING firmware and run into anything else that looks like duplicate state, please flag it on Discord — but for the `otthing/*` retained topics specifically, the cleanup recipe above is the supported answer.
+If you are coming from OTTHING firmware and run into anything else that looks like duplicate state, please flag it on Discord. But for the `otthing/*` retained topics specifically, the cleanup recipe above is the supported answer.
 
 ## Reference
 
-- `src/OTGW-firmware/MQTTstuff.h:51` — current top-level topic prefix default (`sTopTopic = "OTGW"`).
-- `src/OTGW-firmware/OTGW-firmware.h:517` — `BOARD_SEEGEL_OTTHING` build target, acknowledging the OTTHING platform port history.
-- TASK-570 — backlog entry for this guide.
+- `src/OTGW-firmware/MQTTstuff.h:51`: current top-level topic prefix default (`sTopTopic = "OTGW"`).
+- `src/OTGW-firmware/OTGW-firmware.h:517`: `BOARD_SEEGEL_OTTHING` build target, acknowledging the OTTHING platform port history.
+- TASK-570: backlog entry for this guide.

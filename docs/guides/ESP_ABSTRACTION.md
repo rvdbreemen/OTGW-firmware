@@ -1,4 +1,4 @@
-# ESP8266 / ESP32 Platform Abstraction — Consolidated Reference
+# ESP8266 / ESP32 Platform Abstraction: Consolidated Reference
 
 > One map for the whole abstraction. This guide does **not** introduce new
 > policy; it points at the authoritative pieces (ADRs, the CI gate, the audit,
@@ -34,11 +34,11 @@ If a feature has no `HAS_*` flag yet, you add the flag to `boards.h` first.
 
 These are the **only** places raw platform/board conditionals belong:
 
-- `src/OTGW-firmware/platform.h` — dispatcher (`#ifdef ESP8266` → includes the right header).
-- `src/OTGW-firmware/platform_esp8266.h` — ESP8266 includes, shims, type aliases (~35+ shims).
-- `src/OTGW-firmware/platform_esp32.h` — ESP32 includes, shims, type aliases (parity set).
-- `src/OTGW-firmware/boards.h` — pin maps + `HAS_*` capability flags; reads the raw `BOARD_NODOSHOP_*` macros so nothing else has to.
-- `src/OTGW-firmware/OTGW-ModUpdateServer{.h,-esp32.h,-impl.h}` — parallel mini-abstraction for the firmware-update server.
+- `src/OTGW-firmware/platform.h`: dispatcher (`#ifdef ESP8266` → includes the right header).
+- `src/OTGW-firmware/platform_esp8266.h`: ESP8266 includes, shims, type aliases (~35+ shims).
+- `src/OTGW-firmware/platform_esp32.h`: ESP32 includes, shims, type aliases (parity set).
+- `src/OTGW-firmware/boards.h`: pin maps + `HAS_*` capability flags; reads the raw `BOARD_NODOSHOP_*` macros so nothing else has to.
+- `src/OTGW-firmware/OTGW-ModUpdateServer{.h,-esp32.h,-impl.h}`: parallel mini-abstraction for the firmware-update server.
 
 **Out of scope entirely:** vendored libraries under `src/libraries/**`
 (e.g. `OTGWSerial`, `SimpleTelnet`). They manage their own platform support and
@@ -68,12 +68,12 @@ So the number only ever goes down. To see the current live count:
 
 ## The roadmap (audit + tier tasks)
 
-- **Audit:** `docs/audits/2026-05-28-esp-abstraction-leak-audit.md` (TASK-739) —
+- **Audit:** `docs/audits/2026-05-28-esp-abstraction-leak-audit.md` (TASK-739),
   the original leak inventory + remediation plan.
-- **Tier tasks:** TASK-740..746 — each removes a class of leak and lowers the
+- **Tier tasks:** TASK-740..746: each removes a class of leak and lowers the
   baseline. TASK-743 (Tier 3) moved tuning constants to `boards.h` and added
   the platform shim set; later chunks took the baseline to 16.
-- **Known remaining leaks** (documented, deferred — see the tier-task notes):
+- **Known remaining leaks** (documented, deferred: see the tier-task notes):
   the `jsonStuff.ino` REST-TX coalescing buffer (highest-risk chunk), the
   `MQTTstuff.ino` heap-pressure pair (couples to app-side `getHeapHealth`),
   `SATmqttPublish.h` `os_random`/`esp_random` (include-order: the header loads
@@ -81,7 +81,7 @@ So the number only ever goes down. To see the current live count:
   global (a one-definition-rule guard that is structurally necessary, not a
   removable leak).
 
-## Adding a platform-divergent feature — the checklist
+## Adding a platform-divergent feature: the checklist
 
 1. Need a divergent API? Add `platformXxx()` to **both** `platform_esp8266.h`
    and `platform_esp32.h` (real body where the feature exists, inline no-op stub
@@ -89,10 +89,10 @@ So the number only ever goes down. To see the current live count:
 2. Need an optional feature? Add a `HAS_*` flag to `boards.h`, gate with
    `#if HAS_*` (not `#ifdef ESP32`).
 3. Never call `ESP.getXxx()` directly when a `platformXxx()` shim exists
-   (`platformFreeHeap`, `platformRestart`, `platformChipId`, …) — skipping the
+   (`platformFreeHeap`, `platformRestart`, `platformChipId`, …), skipping the
    shim is a quieter form of the same leak.
 4. Build **every** target (`python build.py --target all`, check per-env SUCCESS lines) and
-   run `python evaluate.py --quick` — the gate must not regress.
+   run `python evaluate.py --quick`: the gate must not regress.
 
 ## Related
 

@@ -14,7 +14,7 @@ Run before requesting review:
   ```bash
   python build.py
   ```
-  Both binaries must appear in `build/` with size within a sensible range of the previous release. Sudden +50 KB is a red flag — investigate.
+  Both binaries must appear in `build/` with size within a sensible range of the previous release. Sudden +50 KB is a red flag. Investigate.
 
 - [ ] **`evaluate.py --quick` health unchanged or improved**
   ```bash
@@ -56,9 +56,9 @@ Run before requesting review:
 
 ### Authentication / CSRF / session changes
 
-- [ ] From a real browser, issue a cross-origin POST to `/api/v2/settings` with valid credentials — must be rejected (CSRF blocks it).
-- [ ] From the same-origin web UI, issue the same POST — must succeed.
-- [ ] `collectHeaders()` in `FSexplorer.ino` still registers every header the auth layer reads (Origin, Referer, If-None-Match at minimum) — this was silently broken in 2026-04 and is the template for future header-based logic.
+- [ ] From a real browser, issue a cross-origin POST to `/api/v2/settings` with valid credentials. Must be rejected (CSRF blocks it).
+- [ ] From the same-origin web UI, issue the same POST: must succeed.
+- [ ] `collectHeaders()` in `FSexplorer.ino` still registers every header the auth layer reads (Origin, Referer, If-None-Match at minimum). This was silently broken in 2026-04 and is the template for future header-based logic.
 
 ### OTA / flash path changes
 

@@ -2,7 +2,7 @@
 
 Full CLI reference for task management in this project. Read this when you need command details.
 
-> CLI version: **backlog.md v1.46.1** — updated from v1.40.0; notable additions: task comments, modified-file tracking, label management, milestone filter on task list, enhanced search filters. Robert's workstation runs v1.55.3 (checked 2026-11-04); the commands below work on both.
+> CLI version: **backlog.md v1.46.1**: updated from v1.40.0; notable additions: task comments, modified-file tracking, label management, milestone filter on task list, enhanced search filters. Robert's workstation runs v1.55.3 (checked 2026-11-04); the commands below work on both.
 
 ---
 
@@ -177,9 +177,9 @@ Not every AC survives contact with reality. When it becomes clear mid-task that 
 
 **Prior art** (good examples of deviations documented correctly):
 
-- TASK-296 (evaluate.py String class) — widened regex and split reporting per spec, but the AC-2 promotion to FAIL was deferred because 19 existing hot-path violations would block every CI run. Note explained the deferral + follow-up for burning down the debt.
-- TASK-294 (CSRF collectHeaders) — code fix landed, but the AC-2 browser cross-origin proof was deferred to the pre-release smoke test (hardware required). Flagged in the final summary, not silently skipped.
-- TASK-308 (build.py smoke tests) — --help smoke shipped; AC-2 fixture-based `_parse_image_header` parser was deferred with a follow-up proposal, because extracting a pure parser was out of scope for the smoke test.
+- TASK-296 (evaluate.py String class): widened regex and split reporting per spec, but the AC-2 promotion to FAIL was deferred because 19 existing hot-path violations would block every CI run. Note explained the deferral + follow-up for burning down the debt.
+- TASK-294 (CSRF collectHeaders): code fix landed, but the AC-2 browser cross-origin proof was deferred to the pre-release smoke test (hardware required). Flagged in the final summary, not silently skipped.
+- TASK-308 (build.py smoke tests): --help smoke shipped; AC-2 fixture-based `_parse_image_header` parser was deferred with a follow-up proposal, because extracting a pure parser was out of scope for the smoke test.
 
 The rule of thumb: if a reviewer looking at your commit a year later can't tell which ACs were literal vs which were negotiated, your deviation isn't documented well enough.
 

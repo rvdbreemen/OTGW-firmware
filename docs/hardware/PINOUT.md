@@ -2,11 +2,11 @@
 
 Canonical GPIO map for every supported OTGW hardware variant. Four configurations:
 
-1. **OTGW Classic (PIC)** — Wemos D1 mini (ESP8266) + PIC microcontroller.
+1. **OTGW Classic (PIC)**: Wemos D1 mini (ESP8266) + PIC microcontroller.
 2. **OTGW32**: the OpenTherm Gateway OTGW32 board, ESP32-S3, native OTDirect (no PIC).
-3. **esp32-classic (S3 in Classic socket)** — LOLIN S3 Mini dropped into the
+3. **esp32-classic (S3 in Classic socket)**: LOLIN S3 Mini dropped into the
    Classic D1-mini socket; fixed compile-time PIC build (ADR-126).
-4. **esp32-combo (ADR-127)** — one ESP32-S3 binary that carries the OTGW32 map
+4. **esp32-combo (ADR-127)**: one ESP32-S3 binary that carries the OTGW32 map
    (table 2) *and* the Classic-on-S3 map (table 3) and boot-detects which board
    it is running on. See section 4.
 
@@ -25,7 +25,7 @@ behind each hole changes. That is what makes the esp32-classic build possible.
 
 ---
 
-## 1. OTGW Classic + PIC — Wemos D1 mini (ESP8266)
+## 1. OTGW Classic + PIC: Wemos D1 mini (ESP8266)
 
 Truth = dev branch `OTGW-firmware.h`:
 
@@ -85,7 +85,7 @@ Truth = the reference `hwdef.h` (`#ifdef NODO`), mirrored into `boards.h`
 
 ---
 
-## 3. esp32-classic — S3 Mini in the Classic D1-mini socket (ADR-126)
+## 3. esp32-classic: S3 Mini in the Classic D1-mini socket (ADR-126)
 
 Fixed compile-time PIC build (`BOARD_NODOSHOP_ESP32_CLASSIC`): the same Classic
 PCB as table 1, with the S3 Mini GPIO behind each D1-mini hole. No OTDirect, no
@@ -94,7 +94,7 @@ runtime detection (ADR-126).
 ### 3a. Footprint mapping (D1-mini hole → S3 Mini GPIO)
 
 High-confidence rows are the boot-critical signals, cross-checked against the reference design's
-own W5500 wiring (`SCK/MISO/MOSI = 12/13/11`, which lands on the D5/D6/D7 holes —
+own W5500 wiring (`SCK/MISO/MOSI = 12/13/11`, which lands on the D5/D6/D7 holes,
 an independent confirmation of the footprint).
 
 | D1-mini hole | function | ESP8266 GPIO | S3 Mini GPIO | Confidence |
@@ -114,7 +114,7 @@ an independent confirmation of the footprint).
 | RST | reset | RST | EN | high (S3 Mini pin diagram) |
 
 All rows confirmed against the official LOLIN S3 Mini pin diagram
-(`s3_mini_v1.0.0_4_16x9.jpg`, wemos.cc) — the **outer** pin row is the
+(`s3_mini_v1.0.0_4_16x9.jpg`, wemos.cc), the **outer** pin row is the
 D1-mini-compatible footprint; the inner row carries extra S3 GPIOs.
 Cross-checked against the Arduino core variant
 (`variants/lolin_s3_mini/pins_arduino.h`: TX=43, RX=44, SDA=35, SCL=36,
@@ -140,7 +140,7 @@ ESP32 buffer sizing.
 
 ---
 
-## 4. esp32-combo — one binary, boot-detected (ADR-127)
+## 4. esp32-combo: one binary, boot-detected (ADR-127)
 
 `BOARD_NODOSHOP_ESP32_COMBO` derives the full OTGW32 map (table 2) as its base
 and layers the verified Classic-on-S3 pins (table 3b) on top under the
@@ -168,7 +168,7 @@ Capabilities: `HAS_PIC=1`, `HAS_DIRECT_OT=1`, `HAS_PIC_WATCHDOG=1` (0x26 feed
 runtime-gated on PIC mode; ESP32 TWDT always on), `HAS_RUNTIME_HW_DETECT=1`,
 OTGW32 peripheral set (Ethernet/OLED/SAT/BLE/weather).
 
-### 4a. Third combo variant — S3 Mini Pro in the Classic socket (ADR-158)
+### 4a. Third combo variant: S3 Mini Pro in the Classic socket (ADR-158)
 
 The combo also boot-detects a **LOLIN S3 Mini Pro** dropped into the Classic
 socket and selects a third pin map (`PIN_CLASSIC_PRO_*`). The Pro reroutes its
@@ -189,7 +189,7 @@ disarm. An IMU hit ⇒ Classic + PIC + Pro pin map; cached/forced via
 | `PIN_CLASSIC_PRO_LED2` | **41** | D0 | LED2 (active LOW) |
 
 Conflicting GPIO positions vs the OTGW32 base (resolved by the runtime
-accessors, one owner per boot — Ethernet inits only in OTDirect mode):
+accessors, one owner per boot. Ethernet inits only in OTDirect mode):
 
 | GPIO | Classic-Pro | OTGW32 |
 |---|---|---|
