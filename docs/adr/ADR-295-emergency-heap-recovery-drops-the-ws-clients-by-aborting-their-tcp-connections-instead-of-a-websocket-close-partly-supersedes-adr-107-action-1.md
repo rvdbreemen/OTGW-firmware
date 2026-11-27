@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-107"
+  - "ADR-301"
 topics:
   - "emergency heap recovery"
   - "websocket"

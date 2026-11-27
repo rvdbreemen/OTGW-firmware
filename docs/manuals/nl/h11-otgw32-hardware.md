@@ -5,15 +5,22 @@
 Firmware 2.0 ondersteunt precies twee hardwareconfiguraties:
 
 1. **De OTGW Classic met een ESP32-S3-module.** De traditionele gateway met de PIC-coprocessor en een LOLIN S3 Mini of S3 Mini Pro in de modulesocket (hoofdstuk 2).
-2. **De OpenTherm Gateway OTGW32.** Een print met een ESP32-S3 die zelf OpenTherm spreekt, met een eigen interface naar de ketel en naar de thermostaat. Op deze print zit geen PIC. Dit hoofdstuk beschrijft hem. Hoofdstuk 12 zet de twee naast elkaar.
+2. **De OpenTherm Gateway OTGW32.** Een print met een ESP32-S3 die zelf OpenTherm spreekt, met eigen aansluitingen naar de ketel en naar de thermostaat. Op deze print zit geen PIC. Dit hoofdstuk beschrijft hem. Hoofdstuk 12 zet de twee naast elkaar.
 
-> **De OTGW32 is een nieuw apparaat en moet zich nog in het veld bewijzen.** Er bestaat op dit moment alleen versie 1.0, de eerste productierun. Firmware 2.0 ondersteunt hem, maar de firmware heeft tot nu toe alleen op een testopstelling gedraaid, zonder thermostaat en zonder echte ketel op de bus (een gesimuleerde ketel, en masterstand zonder thermostaat). Nog niet in het veld bewezen: de verscheidenheid aan ketels en thermostaten, lange runs, de opties Ethernet en OLED op echte hardware, en OTmonitor via poort 25238. Draait u een OTGW32? Stuur dan bij uw melding een capture mee (zie hoofdstuk 7).
+**Wat werkt op de OTGW32:** alles waarvoor de gateway er is (OpenTherm, MQTT, Home Assistant, SAT). Een paar optionele extra's (Bluetooth-sensoren, lange grafiekgeschiedenis, grotere buffers) hebben PSRAM (extra werkgeheugen) nodig en staan op deze print uit.
+
+**Ook niet op de OTGW32:** het bypass-relais (hardwareversie 1.1 heeft er plaats voor; het is bij levering niet gemonteerd en de firmware gebruikt het niet), een kant-en-klaar klemmenblok (het 10-polige blok J4 is in de fabriek niet gemonteerd: u monteert het zelf) en PIC-firmware-updates (er is geen PIC).
+
+> **De OTGW32 is nieuw en de firmware ervoor heeft nog niet in een echt huis gedraaid.** De hardwareversies 1.0 en 1.1 lijken sterk op elkaar; versie 1.1 heeft een optioneel bypass-relais dat niet is gemonteerd bij levering en dat de firmware niet gebruikt. Firmware 2.0 ondersteunt hem, maar de firmware heeft tot nu toe alleen op een testapparaat gedraaid, zonder thermostaat en zonder echte ketel op de bus (een gesimuleerde ketel, en masterstand zonder thermostaat). Nog niet in het veld bewezen: hoe het zich gedraagt met verschillende ketels en thermostaten, lange runs, de opties Ethernet en OLED op echte hardware, en OTmonitor (een pc-programma voor de OpenTherm Gateway) via poort 25238. Draait u een OTGW32? Stuur dan bij uw melding een capture mee (zie hoofdstuk 7).
+
+**Welke heeft u?** Na de eerste flash laat het apparaat het zien: de webinterface heeft op een OTGW Classic een tabblad Advanced, PIC firmware en op een OTGW32 niet, en `hardware_type` in de device info (`/api/v2/device/info`) is `otgw-classic` of `otgw32`. Weet u niet zeker welke print u heeft, vraag het dan in het Discord-supportkanaal voordat u flasht: een fabrieksinstallatie wist het apparaat.
 
 ### 11.1 Wat het is
 
-- **Processor en geheugen:** een ESP32-S3 met 4 MB flash en zonder PSRAM (het extra geheugen dat de LOLIN S3 Mini-module wel heeft). De firmware controleert tijdens het draaien of er PSRAM is.
-- **OpenTherm:** de ESP32-S3 stuurt zelf de ketelzijde en de thermostaatzijde aan. De firmware noemt dit OT-Direct. Er is geen PIC, dus er is ook geen PIC-firmware om bij te werken.
+- **Processor en geheugen:** een ESP32-S3 met 4 MB flash en zonder PSRAM (extra werkgeheugen; de LOLIN S3 Mini-module heeft het wel). De firmware controleert tijdens het draaien of er PSRAM is.
+- **OpenTherm:** de ESP32-S3 stuurt zelf de ketelzijde en de thermostaatzijde aan. De firmware noemt dit OT-Direct (de ESP32 doet het werk dat de PIC op de Classic doet). Er is geen PIC, dus er is ook geen PIC-firmware om bij te werken.
 - **Opties in de firmware:** bekabeld Ethernet (een W5500-chip), een klein OLED-schermpje en een ingang voor een Dallas-temperatuursensor worden door de firmware ondersteund. In onze tests zijn ze nog niet op echte OTGW32-hardware gezien.
+- **Aansluitblok:** het 10-polige klemmenblok (J4) is in de fabriek niet gemonteerd; u monteert het zelf. Klem 1 is de klem die het dichtst bij de resetknop zit. Klem 1 en 2 zijn de OpenTherm-lijnen van de ketel en klem 3 en 4 zijn de OpenTherm-lijnen van de thermostaat. Klem 5 tot en met 10 voeren voeding, massa, een digitaal-ingangspad met het opschrift DI en de 1-wire-lijn, maar de volgorde kennen we nog niet. Sluit er niets op aan zolang die niet is gedocumenteerd. Het DI-pad is waarschijnlijk de SW-lijn; waar het op is aangesloten en of u het mag gebruiken, is niet bevestigd.
 - **Wat het apparaat meldt:** `GET /api/v2/device/info` toont `hardware_type` `otgw32` en de hardwaremodus `OT-Direct`. MQTT publiceert hetzelfde als `otgw-firmware/hardware_type` en `otgw-firmware/hardware_mode`.
 
 ### 11.2 De werkstanden
@@ -27,7 +34,7 @@ OT-Direct kent deze standen. Kies er een in de webinterface (Settings, OT-Direct
 | **Master** | Het apparaat is de OpenTherm-master en vraagt de ketel zelf uit. Een thermostaat is optioneel: blijft er een aangesloten, dan beantwoordt het apparaat die uit zijn cache en geeft het de instellingen ervan door aan de ketel. | `GW=2` of `GW=S` |
 | **Loopback** | Een teststand met gesimuleerde ketelantwoorden. Er is geen hardware voor nodig. | `GW=L` |
 
-Een vijfde stand, **bypass** (de thermostaat via een relais rechtstreeks op de ketel), staat op sommige plaatsen genoemd, maar deze release heeft geen ondersteuning voor dat relais: kiest u bypass, dan valt het apparaat terug op gateway en antwoordt `GW=P` met `NG`. Reken dus niet op bypass.
+Een vijfde stand, **bypass** (de thermostaat via een relais rechtstreeks op de ketel), staat op sommige plaatsen genoemd, maar deze release heeft geen ondersteuning voor dat relais (hardwareversie 1.1 heeft een optioneel relais, niet gemonteerd bij levering, en de firmware gebruikt het niet): kiest u bypass, dan valt het apparaat terug op gateway en antwoordt `GW=P` met `NG`. Reken dus niet op bypass.
 
 De stand staat in de instelling `OTDmode` en blijft na een herstart bewaard. In gatewaystand luistert het apparaat bij het opstarten 5 seconden naar de thermostaat. Hoort het er geen, dan draait het alleen die start in masterstand; bij de volgende start kijkt het opnieuw.
 
@@ -35,7 +42,8 @@ De stand staat in de instelling `OTDmode` en blijft na een herstart bewaard. In 
 
 - **Eerste installatie via USB:** gebruik `flash_otgw.bat` (Windows) of `./flash_otgw.sh` (Linux en macOS) uit de release-zip. Een fabrieksinstallatie wist het apparaat: het WiFi-wachtwoord en de instellingen zijn weg. De tool vindt de USB-poort zelf. (De oudere flashgids geldt alleen voor de 1.x ESP8266.)
 - **Bijwerken via WiFi:** open `http://<device-ip>/update` en geef de release-zip. De instellingen blijven bewaard; bewaar ze toch eerst.
-- **Waarschuwing voor de verwarming:** bij een apparaat dat rechtstreeks met de ketel praat, is de verbinding tussen thermostaat en ketel tijdens de update onderbroken, 1 tot 2 minuten. De ketel draait dan op zijn eigen instellingen. Kies een rustig moment.
+
+> **Voor u bijwerkt:** gedurende 1 tot 2 minuten is de thermostaat niet met de ketel verbonden en draait de ketel op zijn eigen instellingen. Kies een moment waarop niemand de komende minuten een warm huis nodig heeft.
 - **Flashindeling:** safeboot 960 KB, firmware 2240 KB, webbestanden 768 KB. Een apparaat met een oudere indeling heeft de eenmalige USB-migratie nodig (`flash_otgw --migrate --host <ip>`).
 
 ### 11.4 Hoe het apparaat merkt dat het een OTGW32 is
@@ -53,14 +61,16 @@ De webinterface volgt wat het apparaat meldt (`otcommandinterface`), niet de naa
 - De panelen **OT-Direct overrides** en **OT-Direct status** en de instelling voor de OT-Direct-stand worden getoond.
 - De rest is gelijk: Home, Monitor, SAT, Settings.
 
-### 11.6 Grenzen door 4 MB flash en geen PSRAM
+### 11.6 Optionele extra's die PSRAM nodig hebben, en andere grenzen
 
-- **Grafiekgeschiedenis** bewaart 1 uur. Apparaten met PSRAM bewaren een langere geschiedenis (tot 7 dagen).
-- **Bluetooth (BLE) kan niet worden aangezet** zonder PSRAM: de instelling is zichtbaar maar wordt geweigerd. Een Bluetooth-kamersensor kan dus op een OTGW32 niet voor SAT dienen.
+De kern van de gateway hangt niet af van PSRAM. Onderstaande lijst is wat anders is op een print met 4 MB flash en zonder PSRAM.
+
+- **Grafiekgeschiedenis** bewaart op deze print 1 uur. Apparaten met PSRAM bewaren een langere geschiedenis (tot 7 dagen).
+- **Bluetooth (BLE) staat op deze print uit** omdat het PSRAM nodig heeft: de instelling is zichtbaar maar wordt geweigerd. Een Bluetooth-kamersensor kan dus op een OTGW32 niet voor SAT dienen.
 - **REST:** voorlopig worden maximaal 2 verzoeken tegelijk beantwoord. Een derde krijgt HTTP 503 `Retry-After: 1`. De grens is voor deze printklasse niet gemeten.
 - **Diagnose-recorder:** een kleine buffer van ongeveer 2 minuten in plaats van de grote.
 - **MQTT:** een apparaat zonder extra geheugen verstuurt pieken in stappen; de grenzen zijn daarvoor nog niet gekalibreerd (zie Known issues in de releasenotes).
-- **Vrije headerpinnen:** de standaardpinnen voor de S0-teller (GPIO 12), de GPIO-uitgang (GPIO 16) en de Dallas-sensor (GPIO 10) zijn pinnen die de print zelf gebruikt. De firmware weigert daarom de Dallas-standaard en start geen sensoren totdat u een vrije pin kiest. Welke headerpinnen vrij zijn, is nog niet gedocumenteerd.
+- **Pinnen:** bekabeld Ethernet (W5500) gebruikt SPI op GPIO 11, 12, 13, 14 en 15, en de 1-Wire-ingang voor Dallas-sensoren zit op GPIO 4 (hardware-informatie van een OTGW32-bezitter, in overeenstemming met de pinnentabel in `docs/hardware/PINOUT.md`). De standaardpinnen van de firmware voor de Dallas-sensor (GPIO 10), de S0-teller (GPIO 12) en de GPIO-uitgang (GPIO 16) zijn pinnen die de print zelf gebruikt. De firmware weigert daarom de Dallas-standaard en start geen sensoren totdat u een pin kiest: zet de Dallas-pin op 4. Het tellen van een S0-energiemeter is een firmwarefunctie; op de OTGW32 heeft het een ingangspin nodig. Het klemmenblok heeft een digitaal-ingangspad (DI, waarschijnlijk GPIO 5); de pin is nog niet bevestigd, kies de pin dus tot die tijd zelf in de instellingen. De GPIO-uitgang heeft op deze print geen pad en is niet beschikbaar. De ESP32-S3-module zelf heeft ongebruikte pinnen die niet naar een connector zijn doorgevoerd.
 
 ### 11.7 Wat gelijk is aan de OTGW Classic
 

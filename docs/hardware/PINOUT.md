@@ -60,6 +60,8 @@ D6=12, D7=13, D8=15, TX=1, RX=3, A0=ADC`.
 Truth = the reference `hwdef.h` (`#ifdef NODO`), mirrored into `boards.h`
 `BOARD_NODOSHOP_ESP32`. No PIC: OT protocol is driven directly by OTDirect.
 
+The 10 way terminal block (J4) is not fitted at the factory; the user fits it. Terminal 1 is the one nearest the reset button. Terminals 1 and 2 are the OpenTherm boiler lines and terminals 3 and 4 are the OpenTherm thermostat lines. Terminals 5 to 10 carry power, ground, a digital-input pad labelled DI and the 1-wire line (GPIO 4); we do not know the order yet. Do not connect anything to terminals 5 to 10 until it is documented. The photo of the board shows the DI pad; it is probably the SW line (net SWR on GPIO 5 in the schematic), and what it is wired to and whether it may be used is not confirmed (hardware information from an OTGW32 owner). S0 energy meter counting is a firmware feature and needs an input pin: the DI pad is the candidate, the pin is not confirmed yet. The GPIO output has no pad on this board.
+
 | Signal | S3 GPIO | Notes |
 |---|---|---|
 | OT master IN (from boiler) | 21 | OTDirect master |
@@ -82,6 +84,8 @@ Truth = the reference `hwdef.h` (`#ifdef NODO`), mirrored into `boards.h`
 | LED green (OT) | 48 | active HIGH |
 | Boot button | 0 | active LOW |
 | Config button | 9 | active LOW |
+
+Schematic check (net names of the ESP32-S3 module, from the picture an OTGW32 owner sent, 2026-11-27): the nets agree with the table for GPIO 0 (BOOT), 1 (OTM_TX), 2 (RED), 4 (DQ, the 1-wire line), 6 (OTS_RX), 7 (OTS_TX), 9 (CFG), 11 (MOSI), 12 (SCK), 13 (MISO), 14 (CS), 15 (INT), 16 (RST), 17 (SCL), 18 (SDA) and 21 (OTM_RX). GPIO 47 is named REL in the picture; that it is the bypass relay is likely but not confirmed. Not in the table: the picture shows a net SWR on GPIO 5 (the firmware does not use GPIO 5 and the meaning of SWR is not confirmed; it may be the SW terminal), and no net on GPIO 3. Unresolved differences: GPIO 10 is named EN24 in the picture while the table says an 18 V step-up; GPIO 8 is named GRN and GPIO 48 RGN while the table calls GPIO 8 the status LED and GPIO 48 the OT green LED. The picture shows no net for an S0 counter or a GPIO output.
 
 ---
 
