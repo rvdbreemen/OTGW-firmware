@@ -3,11 +3,11 @@ id: TASK-3054
 title: >-
   SAT: remove the default of bandOff in satChEnableDecide so a caller that
   forgets it fails to compile (2.1.0 hardening after TASK-3034)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-25T10:29:00Z'
-updated_date: '2026-11-25T11:34:00Z'
+updated_date: '2026-11-27T12:32:00Z'
 labels:
   - sat
 milestone: 2.1.0
@@ -36,3 +36,9 @@ TASK-3034 found a caller (the diag input of satDiagEventsStep) that omitted band
 
 2026-11-25 build: esp32-combo from 0742d150a (2.0.0-beta.429+0742d15), 'Build completed successfully!', fresh artifacts 12:03-12:04, app 2158544 B of 2293760 B (94.1 %), free 135216 B; evaluate --quick 89 passed / 0 failed. NOT bench-tested: compile-time guard plus comment, no behaviour change; the soak of the next public beta covers it. AC1 and AC2 have evidence (test red with the default, green on the fix; every caller passes the argument); AC3 holds for the SAT tests named above, the whole tests/ folder is rerun separately.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by otgw-docs in the 2026-11-27 closure sweep, evidence from the task notes of 2026-11-25. AC1: satChEnableDecide has no default for bandOff (SATchEnable.h:94), firmware calls and 9 test/script call sites pass it. AC2: tests/test_sat_ch_enable_band_required.py, 4 tests, red with the default restored, green on the fix. AC3: evaluate --quick 89 passed / 0 failed, the named SAT host tests green, esp32-combo build OK from 0742d150a (beta.429+0742d15), which is on origin/dev. Not verified: no bench run (compile-time guard, no behaviour change); the whole tests/ folder was to be rerun separately and is not recorded in the notes.
+<!-- SECTION:FINAL_SUMMARY:END -->
