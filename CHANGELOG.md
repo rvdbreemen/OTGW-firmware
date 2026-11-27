@@ -5,9 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.455] - 2026-11-27
+
+Build in this beta: beta.455 only (previous public beta: beta.452; beta.453 and beta.454 were never published). It is the build that ran 60 minutes without a restart on two test units.
+
+### Changed
+- Web UI live connections: when memory is almost out, the gateway drops the browser connections of the live log at once instead of asking each tab to close; a tab connects again by itself after about 5 seconds in the bench (TASK-3025, ADR-295). New counter `hd_ws_recovery_abort` in `GET /api/v2/device/info`.
+- Web UI live connections: a new connection is refused at the handshake while memory is almost gone, so the gateway no longer builds a connection it cannot close safely; a bench build panicked in 1 of 2 runs without this (TASK-3119). Checked with emulated browser tabs on a test unit (3 of 3 runs without a panic); not proven in real browsers.
+- Manual: new chapters 11 and 12 on hardware configurations; README says which release file to download (TASK-3115).
+- Internal: 42 changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
+
 ### Known issues
 - Memory dip in the first minutes after a start on a unit without PSRAM (the OTGW32): in the release soak of beta.452 the lowest free memory dropped to 648 bytes about 5 minutes after the start and the unit reported a critical memory state once. It did not restart or crash and the memory recovered to about 46 KB. The same unit showed a similar dip on beta.418, so it is not new in beta.452. Open (TASK-3024).
-- Under very low memory a new browser connection can crash the gateway: in one bench run with 2 browser tabs reconnecting, the unit restarted about 5 seconds after a memory recovery when the web UI opened a new live connection. Not new in beta.452. The cause is not proven; open (TASK-3119).
 
 ## [2.0.0-beta.452] - 2026-11-27
 
@@ -1265,7 +1274,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.455...HEAD
+[2.0.0-beta.455]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.455
 [2.0.0-beta.452]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.451...v2.0.0-beta.452
 [2.0.0-beta.451]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.438...v2.0.0-beta.451
 [2.0.0-beta.438]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.432...v2.0.0-beta.438
