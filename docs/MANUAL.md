@@ -1870,10 +1870,10 @@ Zones receive their temperature and target via MQTT. Each zone, zone 1 included,
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| `satzonecount` | 1 | 1-4 | Number of active heating zones |
+| `satzonecount` | 0 | 0-4 | Number of extra rooms next to the main room (0 = none) |
 | `satzonetimeout` | 300 | 60-3600 s | Seconds without update before a zone goes inactive |
 
-When `satzonecount` is 1 (default), SAT only uses a zone if room and target data is pushed for it. A zone without data does not count, so a setup without zone data behaves as before. The per-zone MQTT diagnostics (`sat/zone/<n>/...`) are published only when more than one zone is configured.
+`satzonecount` counts the extra rooms next to the main room: 0 (default) means no extra rooms, 1 to 4 add that many. SAT only uses an extra room if room and target data is pushed for it. A room without data does not count, so a setup without zone data behaves as before. The per-zone MQTT diagnostics (`sat/zone/<n>/...`) are published from one extra room, and only for a room that has received data. The retained state `sat/zone_count` echoes the setting, and `GET /api/v2/sat/status` lists the rooms in a `zones` array. An installation that saved its settings before this key existed keeps 1.
 
 ---
 
@@ -4160,7 +4160,7 @@ All SAT endpoints require authentication.
 
 ##### GET /api/v2/sat
 
-Returns full SAT status. Alias: `GET /api/v2/sat/status`.
+Returns full SAT status. Alias: `GET /api/v2/sat/status`. It includes a `zones` array with one object per extra room (`index` from 1, `room_temp`, `setpoint`, `active`; `room_temp` and `setpoint` are `null` until the room has received data), up to `satzonecount` rooms; the array is empty when `satzonecount` is 0.
 
 Add `?detail=full` for extended diagnostics including synchronization health, pressure metrics, cycle diagnostics, and PID error statistics.
 

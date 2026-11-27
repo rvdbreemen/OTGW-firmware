@@ -509,10 +509,10 @@ Zones ontvangen hun temperatuur en doel via MQTT. Elke zone, ook zone 1, is een 
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
-| `satzonecount` | `1` | 1-4 | Aantal actieve verwarmingszones |
+| `satzonecount` | `0` | 0-4 | Aantal extra ruimtes naast de hoofdruimte (0 = geen) |
 | `satzonetimeout` | `300` | 60-3600 s | Seconden zonder update voordat een zone inactief wordt |
 
-Wanneer `satzonecount` 1 is (standaard), gebruikt SAT een zone alleen als er ruimte- en doelwaarden voor worden gepusht. Een zone zonder gegevens telt niet mee, dus een opstelling zonder zonegegevens gedraagt zich zoals voorheen. De MQTT-diagnosewaarden per zone (`sat/zone/<n>/...`) worden alleen gepubliceerd bij meer dan een geconfigureerde zone.
+`satzonecount` telt de extra ruimtes naast de hoofdruimte: 0 (standaard) betekent geen extra ruimtes, 1 tot 4 voegen er zoveel toe. SAT gebruikt een extra ruimte alleen als er ruimte- en doelwaarden voor worden gepusht. Een ruimte zonder gegevens telt niet mee, dus een opstelling zonder zonegegevens gedraagt zich zoals voorheen. De MQTT-diagnosewaarden per zone (`sat/zone/<n>/...`) worden gepubliceerd vanaf een extra ruimte, en alleen voor een ruimte die gegevens heeft ontvangen. De retained status `sat/zone_count` geeft de instelling weer en `GET /api/v2/sat/status` toont de ruimtes in een `zones`-array. Een installatie die zijn instellingen opsloeg voordat deze sleutel bestond, houdt 1.
 
 ---
 

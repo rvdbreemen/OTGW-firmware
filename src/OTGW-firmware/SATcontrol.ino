@@ -4102,6 +4102,7 @@ static void satPublishZoneDiagnostics()
   for (uint8_t i = 0; i < zoneCount; i++) {
     feedWatchDog();
     SATZoneState& z = satZones[i];
+    if (z.iLastUpdateMs == 0) continue;   // TASK-3102: a zone that never received data publishes nothing (TASK-1440: no retained traffic for a single-room install)
     // TASK-593: an OFF zone (HVACMode.OFF) reports inactive, matching its exclusion
     // from the zone PID and satAggregateZoneSetpoint().
     bool active = !z.bOff && z.bRoomValid && z.bSpValid && ((now - z.iLastUpdateMs) <= timeoutMs);
@@ -5061,6 +5062,30 @@ static void satEmitStatusLive(JsonEmit& je, float flowTemp, float returnTemp, bo
 // failover flag, and the results of the computed/side-effecting helpers
 // (satGetRoomTemp/OutsideTemp/MaxSetpoint, satCycleGet*, satBoilerHardwarePresent,
 // satGet*Name). settings.sat.* stays live (event-driven).
+// begin sat-status-zones record
+// TASK-3102 (entry 459): the extra rooms for /api/v2/sat/status, index 1-based, so the web UI rows of TASK-3019 can read them.
+// Plain parameters, not a struct, for the same reason as satEmitStatusLive(): the Arduino builder hoists prototypes.
+// A zone is active when it has had data, is not OFF, has a valid room temperature and setpoint, and is not older than the timeout.
+static bool satZoneStatusActive(bool hasData, bool off, bool roomValid, bool spValid, uint32_t lastMs, uint32_t nowMs, uint32_t timeoutMs)
+{
+  return hasData && !off && roomValid && spValid && ((uint32_t)(nowMs - lastMs) <= timeoutMs);
+}
+
+static void satEmitStatusZones(JsonEmit& je, uint8_t n, const bool* hasData, const bool* active, const float* roomTemp, const float* setpoint)
+{
+  je.beginArray(F("zones"));
+  for (uint8_t i = 0; i < n; i++) {
+    je.beginObject();
+    je.field(F("index"),     (int32_t)(i + 1));
+    je.field(F("room_temp"), hasData[i] ? roomTemp[i] : NAN);   // null until the zone has received data
+    je.field(F("setpoint"),  hasData[i] ? setpoint[i] : NAN);
+    je.field(F("active"),    active[i]);
+    je.endObject();
+  }
+  je.endArray();
+}
+// end sat-status-zones record
+
 struct SatStatusSnap {
   OTGWState st;                       // frozen copy of every state.* the emit reads
   float    otToutside;                // OTcurrentSystemState.Toutside
@@ -5081,6 +5106,9 @@ struct SatStatusSnap {
   SatPwmPhaseRec      pwmPh[SAT_PWM_PHASE_HIST];   // TASK-1880: oldest first, pwmPhCount valid
   uint8_t             pwmPhCount;
   SatPwmPhaseCounters pwmPhCnt;
+  uint8_t  zoneN;                    // TASK-3102: extra rooms in the zones array
+  bool     zoneHas[SAT_MAX_ZONES], zoneActive[SAT_MAX_ZONES];
+  float    zoneRoom[SAT_MAX_ZONES], zoneSp[SAT_MAX_ZONES];
 };
 
 static const char* satTuneReasonName(uint8_t r);   // TASK-1881: defined in the satCurveTune block below
@@ -5135,6 +5163,19 @@ void satSendStatusJSON()
     snap->pwmPh[k] = _pwmPhHist[(uint8_t)((_pwmPhHead + SAT_PWM_PHASE_HIST - _pwmPhCount + k) % SAT_PWM_PHASE_HIST)];
   }
   snap->pwmPhCnt      = _pwmPhCnt;
+  {   // TASK-3102: the extra rooms, frozen with the rest
+    uint8_t zc = settings.sat.iZoneCount;
+    if (zc > SAT_MAX_ZONES) zc = SAT_MAX_ZONES;
+    snap->zoneN = zc;
+    const uint32_t zNow = millis(), zTimeoutMs = (uint32_t)settings.sat.iZoneTimeoutS * 1000UL;
+    for (uint8_t i = 0; i < zc; i++) {
+      const SATZoneState& z = satZones[i];
+      snap->zoneHas[i]    = z.iLastUpdateMs != 0;
+      snap->zoneRoom[i]   = z.fRoomTemp;
+      snap->zoneSp[i]     = z.fSetpoint;
+      snap->zoneActive[i] = satZoneStatusActive(snap->zoneHas[i], z.bOff, z.bRoomValid, z.bSpValid, z.iLastUpdateMs, zNow, zTimeoutMs);
+    }
+  }
 
   // DETERMINISM GATE (TASK-883): this closure reads ONLY snap->*, settings.sat.*,
   // and F()/PSTR literals. No live state.*, OTcurrentSystemState.*, millis(), or
@@ -5209,6 +5250,7 @@ void satSendStatusJSON()
       je.endObject();
     }
     je.endArray();
+    satEmitStatusZones(je, snap->zoneN, snap->zoneHas, snap->zoneActive, snap->zoneRoom, snap->zoneSp);   // TASK-3102
     je.field(F("last_cycle_class"),     (int32_t)satReportedLastCycleClass(snap->st.sat, millis()));
     je.field(F("cycle_max_flow"),       snap->st.sat.fCycleMaxFlow);
     je.field(F("cycle_overshoot_sec"),  snap->st.sat.fCycleOvershootSec);
@@ -5659,6 +5701,7 @@ void satPublishMQTT()
   static SATShadowI s_pwm_ph_not_ignited, s_pwm_ph_last_cmd_on, s_pwm_ph_last_ign_delay, s_pwm_ph_last_flame_on, s_pwm_ph_last_ignited;   // TASK-1880
   static SATShadowI s_pv_boost_threshold_w, s_pv_boost_hold_s, s_pv_boost_max_duration_min;
   static SATShadowI s_sensor_max_age, s_cycles_per_hour, s_humidity_timeout_s;
+  static SATShadowI s_zone_count;   // TASK-3102
   static SATShadowI s_control_interval, s_max_modulation;
   static SATShadowI s_heating_system, s_manufacturer_id;
   static SATShadowB s_flame_health, s_valves_open;
@@ -5968,6 +6011,7 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/error_monitoring"),     settings.sat.bErrorMonitoring,         s_error_monitoring,     true);
   publishIfChangedS(F("sat/heating_mode"),         settings.sat.iHeatingMode == 1 ? "eco" : "comfort", s_heating_mode, true);
   publishIfChangedI(F("sat/cycles_per_hour"),      (int32_t)settings.sat.iCyclesPerHour,  s_cycles_per_hour,      true);
+  publishIfChangedI(F("sat/zone_count"),           (int32_t)settings.sat.iZoneCount,      s_zone_count,           true);   // TASK-3102: retained state of the zone_count command
   publishIfChangedF(F("sat/valve_offset"),         settings.sat.fValveOffset,             s_valve_offset,         SAT_EPS_FRACTION, 2, true);
   publishIfChangedB(F("sat/solar_freeze_integral"), settings.sat.bSolarFreezeIntegral,    s_solar_freeze_integral, true);
 
@@ -8650,9 +8694,9 @@ static void satControlLoopRun()
     // in ECO (iHeatingMode 1) only the main room.
     _sat_tolErr = satToleranceMaxError(roomValid, satPidError(effectiveTarget, roomTemp), zoneErr, zoneUse, zoneCount,
                                        settings.sat.iHeatingMode == 1);
-    // Zone diagnostics stay gated at more than one zone: no new retained MQTT traffic for
-    // single-room setups (deliberate, TASK-1440).
-    if (settings.sat.iZoneCount > 1) satPublishZoneDiagnostics();
+    // Zone diagnostics run from one extra room (TASK-3102, entry 459); a zone that never received data publishes nothing
+    // (inside satPublishZoneDiagnostics), so a single-room install with no extra room adds no retained MQTT traffic (TASK-1440).
+    if (settings.sat.iZoneCount > 0) satPublishZoneDiagnostics();
   }
 
   // --- Solar gain compensation on the requested setpoint (thermo-nova climate.py:391-392) ---

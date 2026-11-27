@@ -530,7 +530,7 @@ All SAT endpoints require authentication.
 
 ##### GET /api/v2/sat
 
-Returns full SAT status. Alias: `GET /api/v2/sat/status`.
+Returns full SAT status. Alias: `GET /api/v2/sat/status`. It includes a `zones` array with one object per extra room (`index` from 1, `room_temp`, `setpoint`, `active`; `room_temp` and `setpoint` are `null` until the room has received data), up to `satzonecount` rooms; the array is empty when `satzonecount` is 0.
 
 Add `?detail=full` for extended diagnostics including synchronization health, pressure metrics, cycle diagnostics, and PID error statistics.
 

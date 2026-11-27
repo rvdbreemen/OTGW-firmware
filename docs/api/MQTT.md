@@ -323,7 +323,7 @@ SAT topics no longer publish on every control cycle. Each topic under `sat/*` us
 
 **Home Assistant restart:** the ADR-174 republish resets the OT trackers and the SAT core-state shadows listed above. The other SAT shadows keep their last-published state, so the other non-retained `sat/*` topics (the BLE values included) wait for their next change or heartbeat, up to 11 minutes.
 
-**Exceptions to on-change + heartbeat:** the multi-zone diagnostics `sat/zone/<n>/*` are published retained on every multi-zone control pass, and when preset `"none"` restores the saved target, `sat/target` is published at once (retained) before the next regular pass.
+**Exceptions to on-change + heartbeat:** the zone diagnostics `sat/zone/<n>/*` are published retained, on change, from one extra room and only for a zone that has received data, and when preset `"none"` restores the saved target, `sat/target` is published at once (retained) before the next regular pass.
 
 **Float tolerance constants** (from `SATmqttPublish.h`):
 
@@ -633,13 +633,14 @@ The location the weather fetch and the sun elevation use (`satweatherlat`, `satw
 
 #### Multi-zone Diagnostics
 
-Published retained on every multi-zone control pass, for each configured zone n (1-based). These topics bypass the on-change + heartbeat helpers.
+Published retained through the on-change helpers (ADR-111), for each configured extra room n (1-based) that has received data. With `zone_count` 0, or for a room that never received data, nothing is published.
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
 | `sat/zone/<n>/active` | `"true"` / `"false"` | yes | Zone has fresh room temperature and setpoint and is not off |
 | `sat/zone/<n>/output` | `"42.5"` | yes | Zone PID output (°C) |
 | `sat/zone/<n>/error` | `"0.50"` | yes | Zone setpoint minus zone room temperature (°C) |
+| `sat/zone_count` | `"0"` | yes | Number of extra rooms (the `zone_count` command, 0 to 4); published with the other settings echoes |
 
 #### SAT Switch State Topics (TASK-284)
 
@@ -1073,7 +1074,7 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | ------------ | ------- | ----------- |
 | `sat/zone/<n>/room_temp` | `"20.5"` | Push room temperature for zone n (1-based index) |
 | `sat/zone/<n>/setpoint` | `"21.0"` | Push setpoint for zone n (1-based index) |
-| `sat/zone_count` | `"2"` | Set number of active zones (1-4) |
+| `sat/zone_count` | `"2"` | Set the number of extra rooms next to the main room (0-4, default 0 = none). State echo: `sat/zone_count` (retained) |
 | `sat/zone_timeout_s` | `"600"` | Set zone inactivity timeout in seconds |
 
 **Solar and Sun Elevation:**

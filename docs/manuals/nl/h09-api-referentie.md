@@ -458,7 +458,7 @@ Meest recente crash-logboek opvragen. Retourneert een leeg object als er geen cr
 
 #### GET /api/v2/sat
 
-Smart Autotune Thermostat status opvragen. Authenticatie vereist. Alias: `GET /api/v2/sat/status`.
+Smart Autotune Thermostat status opvragen. Authenticatie vereist. Alias: `GET /api/v2/sat/status`. De respons bevat een `zones`-array met een object per extra ruimte (`index` vanaf 1, `room_temp`, `setpoint`, `active`; `room_temp` en `setpoint` zijn `null` tot de ruimte gegevens heeft ontvangen), maximaal `satzonecount` ruimtes; de array is leeg bij `satzonecount` 0.
 
 Voeg `?detail=full` toe voor uitgebreide diagnostiek, waaronder synchronisatie-gezondheid, drukmetrieken, cyclusdiagnostiek, PID-foutstatistieken.
 
