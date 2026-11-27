@@ -539,6 +539,20 @@ Loopt de gateway met BLE uit nog steeds vast, of loopt hij vast op een board met
 
 ---
 
+### 7.12b OpenTherm Gateway OTGW32 (geen PIC): wat te controleren
+
+De OTGW32 is een nieuw apparaat dat zich nog in het veld moet bewijzen (hoofdstuk 11). Ziet u iets vreemds op een OTGW32?
+
+- **Controleer als wat hij draait.** `GET /api/v2/device/info` hoort `hardware_type` `otgw32` en de hardwaremodus `OT-Direct` te tonen. Toont hij iets anders, meld dat dan.
+- **Het tabblad PIC firmware ontbreekt en PIC-commando's doen niets.** Dat is normaal: er zit geen PIC op deze print.
+- **Het apparaat draait na een start in masterstand.** In gatewaystand luistert het apparaat bij het opstarten 5 seconden naar de thermostaat. Was de thermostaat op dat moment niet aan of niet aangesloten, dan draait het apparaat die start als master. Herstart het met de thermostaat aangesloten.
+- **Dallas-sensoren starten niet.** De standaardpin (GPIO 10) wordt door de print zelf gebruikt en wordt geweigerd. Kies een vrije pin in de instellingen. Hetzelfde geldt voor de S0-teller en de GPIO-uitgang, waarvan de standaardpinnen botsen met pinnen die de print gebruikt.
+- **Bluetooth kan niet worden aangezet.** Het heeft PSRAM nodig, en die heeft deze print niet.
+- **De grafiek toont maar het laatste uur.** Zonder PSRAM bewaart het apparaat 1 uur geschiedenis.
+- **OTmonitor herstart het apparaat zodra hij de USB-poort opent.** USB is op deze print geen OTmonitor-verbinding. Gebruik TCP-poort 25238 via het netwerk (standaard uit, zie paragraaf 6.7).
+- **Het opstarten duurt een paar seconden langer bij Board mode Auto.** Het apparaat zoekt tot 3 keer naar een PIC. Zet Board mode op OT-Direct om eenmaal te zoeken.
+- **Melden:** stuur een capture mee (zie 7.14) en vermeld welke hardware u heeft.
+
 ### 7.13 Terugzetten naar fabrieksinstellingen
 
 "Fabrieksinstellingen" voor OTGW-firmware betekent: alle opgeslagen instellingen (WiFi, MQTT, NTP, enzovoort) verwijderen zodat het apparaat terugkeert naar de standaardconfiguratie.

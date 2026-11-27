@@ -655,7 +655,7 @@ On hardware without a PIC, a dropdown appears in the settings to select the OT-D
 
 | Mode | Description |
 |---|---|
-| Bypass | Thermostat connected straight through to the boiler; no OT processing |
+| Bypass | Thermostat connected straight through to the boiler; no OT processing. **Not available in this release:** there is no relay support, selecting it falls back to gateway. |
 | Gateway | Full override processing (default) |
 | Monitor | Transparent pass-through; frames are logged but not modified |
 | Master / Standalone | No thermostat required; the gateway acts as sole OT master |
@@ -2734,6 +2734,20 @@ If the gateway still hangs with BLE off, or hangs on a board with PSRAM, collect
 
 ---
 
+### 7.12b OpenTherm Gateway OTGW32 (no PIC): what to check
+
+The OTGW32 is a new device that still has to prove itself in the field (chapter 11). If something looks wrong on one:
+
+- **Check what it is running as.** `GET /api/v2/device/info` should show `hardware_type` `otgw32` and the hardware mode `OT-Direct`. If it shows something else, say so in your report.
+- **The PIC firmware tab is missing and PIC commands do nothing.** That is expected: there is no PIC on this board.
+- **The unit runs in master mode after a start.** In gateway mode the unit listens for the thermostat for 5 seconds at start-up. If the thermostat was not powered or connected at that moment, the unit runs as master for that start. Restart it with the thermostat connected.
+- **Dallas sensors do not start.** The default pin (GPIO 10) is used by the board itself and is refused. Choose a free pin in the settings. The same goes for the S0 counter and the GPIO output, whose defaults clash with pins the board uses.
+- **Bluetooth cannot be switched on.** It needs PSRAM, which this board does not have.
+- **The graph shows only the last hour.** Without PSRAM the unit keeps 1 hour of history.
+- **OTmonitor resets the unit when it opens the USB port.** USB is not an OTmonitor connection on this board. Use TCP port 25238 over the network (off by default, see section 6.7).
+- **Start-up takes a few seconds longer in Board mode Auto.** The unit probes for a PIC up to 3 times. Set Board mode to OT-Direct to probe once.
+- **Reporting:** send a capture (see 7.14) and say which hardware you have.
+
 ### 7.13 Factory Reset
 
 **Method 1: Web UI**
@@ -4342,7 +4356,7 @@ Set OTDirect operating mode.
 |------|----------|-------------|
 | `gateway` | `GW=1` | Full gateway: scheduler + thermostat forwarding + overrides (default) |
 | `monitor` | `GW=0` | Transparent pass-through: all frames forwarded unmodified (PIC parity, TASK-438) |
-| `bypass` | `GW=P` | Thermostat wired directly to boiler via relay; OTDirect inactive |
+| `bypass` | `GW=P` | Thermostat wired directly to boiler via relay; OTDirect inactive. **Not available in this release:** no relay support; the mode falls back to gateway and `GW=P` answers `NG`. |
 | `master` | `GW=S` | Standalone OT master: scheduler only, no thermostat expected |
 | `loopback` | `GW=L` | Internal test: simulated boiler responses, no hardware needed |
 

@@ -1397,7 +1397,7 @@ Switch the OT-direct engine to the requested operating mode. Send `mode` as a fo
 |-------|--------------------|-------------|
 | `gateway` | `GW=1` | Full gateway with scheduler, thermostat forwarding, and overrides (default) |
 | `monitor` | `GW=M` | Transparent pass-through; all frames forwarded unmodified |
-| `bypass` | `GW=0` | Thermostat direct to boiler via hardware relay (requires bypass relay) |
+| `bypass` | `GW=P` | Thermostat direct to boiler via hardware relay. **Not available in this release:** no relay support; the mode falls back to gateway and `GW=P` answers `NG`. (`GW=0` is monitor.) |
 | `master` | `GW=2` | OTGW32 is the sole OT master; scheduler only, no thermostat expected |
 | `loopback` | `GW=L` | Internal loopback test with simulated boiler; no hardware needed |
 

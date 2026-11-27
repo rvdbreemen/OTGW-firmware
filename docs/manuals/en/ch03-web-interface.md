@@ -174,7 +174,7 @@ On hardware without a PIC, a dropdown appears in the settings to select the OT-D
 
 | Mode | Description |
 |---|---|
-| Bypass | Thermostat connected straight through to the boiler; no OT processing |
+| Bypass | Thermostat connected straight through to the boiler; no OT processing. **Not available in this release:** there is no relay support, selecting it falls back to gateway. |
 | Gateway | Full override processing (default) |
 | Monitor | Transparent pass-through; frames are logged but not modified |
 | Master / Standalone | No thermostat required; the gateway acts as sole OT master |

@@ -386,6 +386,20 @@ If the gateway still hangs with BLE off, or hangs on a board with PSRAM, collect
 
 ---
 
+### 7.12b OpenTherm Gateway OTGW32 (no PIC): what to check
+
+The OTGW32 is a new device that still has to prove itself in the field (chapter 11). If something looks wrong on one:
+
+- **Check what it is running as.** `GET /api/v2/device/info` should show `hardware_type` `otgw32` and the hardware mode `OT-Direct`. If it shows something else, say so in your report.
+- **The PIC firmware tab is missing and PIC commands do nothing.** That is expected: there is no PIC on this board.
+- **The unit runs in master mode after a start.** In gateway mode the unit listens for the thermostat for 5 seconds at start-up. If the thermostat was not powered or connected at that moment, the unit runs as master for that start. Restart it with the thermostat connected.
+- **Dallas sensors do not start.** The default pin (GPIO 10) is used by the board itself and is refused. Choose a free pin in the settings. The same goes for the S0 counter and the GPIO output, whose defaults clash with pins the board uses.
+- **Bluetooth cannot be switched on.** It needs PSRAM, which this board does not have.
+- **The graph shows only the last hour.** Without PSRAM the unit keeps 1 hour of history.
+- **OTmonitor resets the unit when it opens the USB port.** USB is not an OTmonitor connection on this board. Use TCP port 25238 over the network (off by default, see section 6.7).
+- **Start-up takes a few seconds longer in Board mode Auto.** The unit probes for a PIC up to 3 times. Set Board mode to OT-Direct to probe once.
+- **Reporting:** send a capture (see 7.14) and say which hardware you have.
+
 ### 7.13 Factory Reset
 
 **Method 1: Web UI**

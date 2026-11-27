@@ -3,7 +3,7 @@
 Canonical GPIO map for every supported OTGW hardware variant. Four configurations:
 
 1. **OTGW Classic (PIC)** — Wemos D1 mini (ESP8266) + PIC microcontroller.
-2. **OTGW32** — OT-Thing OTGW32 PCB, ESP32-S3, native OTDirect (no PIC).
+2. **OTGW32**: the OpenTherm Gateway OTGW32 board, ESP32-S3, native OTDirect (no PIC).
 3. **esp32-classic (S3 in Classic socket)** — LOLIN S3 Mini dropped into the
    Classic D1-mini socket; fixed compile-time PIC build (ADR-126).
 4. **esp32-combo (ADR-127)** — one ESP32-S3 binary that carries the OTGW32 map
@@ -15,7 +15,7 @@ Canonical GPIO map for every supported OTGW hardware variant. Four configuration
 | Configuration | Authority | File |
 |---|---|---|
 | OTGW Classic (PIC) | **dev branch pin defines** | `dev:src/OTGW-firmware/OTGW-firmware.h` (`#define I2CSCL D1` …) |
-| OTGW32 (OTDirect) | **OT-Thing OTGW32 hwdef** (`#ifdef NODO`) | `boards.h` → `BOARD_NODOSHOP_ESP32` |
+| OTGW32 (OTDirect) | **OTGW32 hardware definition** (`#ifdef NODO`) | `boards.h` → `BOARD_NODOSHOP_ESP32` |
 | esp32-classic | ADR-126 standalone section | `boards.h` → `BOARD_NODOSHOP_ESP32_CLASSIC` |
 | esp32-combo | ADR-127 combo delta | `boards.h` → `BOARD_NODOSHOP_ESP32_COMBO` |
 
@@ -55,9 +55,9 @@ D6=12, D7=13, D8=15, TX=1, RX=3, A0=ADC`.
 
 ---
 
-## 2. OTGW32 — OT-Thing PCB (ESP32-S3, OTDirect)
+## 2. OTGW32 board (ESP32-S3, OTDirect)
 
-Truth = OT-Thing `hwdef.h` (`#ifdef NODO`), mirrored into `boards.h`
+Truth = the reference `hwdef.h` (`#ifdef NODO`), mirrored into `boards.h`
 `BOARD_NODOSHOP_ESP32`. No PIC: OT protocol is driven directly by OTDirect.
 
 | Signal | S3 GPIO | Notes |
@@ -93,7 +93,7 @@ runtime detection (ADR-126).
 
 ### 3a. Footprint mapping (D1-mini hole → S3 Mini GPIO)
 
-High-confidence rows are the boot-critical signals, cross-checked against OT-Thing's
+High-confidence rows are the boot-critical signals, cross-checked against the reference design's
 own W5500 wiring (`SCK/MISO/MOSI = 12/13/11`, which lands on the D5/D6/D7 holes —
 an independent confirmation of the footprint).
 
@@ -103,7 +103,7 @@ an independent confirmation of the footprint).
 | RX | UART0 RX | 3 | **44** | high (LOLIN "RX") |
 | D1 | I2C SCL | 5 | **36** | high (LOLIN "SCL") |
 | D2 | I2C SDA | 4 | **35** | high (LOLIN "SDA") |
-| D5 | SPI SCK | 14 | **12** | high (= OT-Thing W5500 SCK) |
+| D5 | SPI SCK | 14 | **12** | high (= reference W5500 SCK) |
 | D6 | SPI MISO | 12 | **13** | high (LOLIN "MISO") |
 | D7 | SPI MOSI | 13 | **11** | high (LOLIN "MOSI") |
 | D8 | SPI SS | 15 | **10** | high (LOLIN "SS", variant `pins_arduino.h`) |

@@ -617,7 +617,7 @@ Bedrijfsmodus instellen.
 |-------|----------|-------------|
 | `gateway` | `GW=1` | Volledige gateway: scheduler + thermostaat-doorschakeling + overrides (standaard) |
 | `monitor` | `GW=0` | Transparante doorvoer: alle frames ongewijzigd doorgestuurd (PIC-parity, TASK-438) |
-| `bypass` | `GW=P` | Thermostaat rechtstreeks op ketel via relais; OTDirect inactief |
+| `bypass` | `GW=P` | Thermostaat rechtstreeks op ketel via relais; OTDirect inactief. **Niet beschikbaar in deze release:** geen relaisondersteuning; de stand valt terug op gateway en `GW=P` antwoordt `NG`. |
 | `master` | `GW=S` | Zelfstandige OT-master: alleen scheduler, geen thermostaat verwacht |
 | `loopback` | `GW=L` | Interne test: gesimuleerde ketelantwoorden, geen hardware nodig |
 

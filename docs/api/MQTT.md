@@ -940,7 +940,7 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | Payload | OT Command | Mode | Description |
 |---------|-----------|------|-------------|
 | `"1"` | `GW=1` | Gateway | Full gateway: scheduler + thermostat forwarding + overrides (default) |
-| `"0"` | `GW=0` | Bypass | Thermostat direct to boiler via relay; OT-direct inactive. Requires bypass relay hardware. On boards without relay: no-op (`NG` response). |
+| `"P"` | `GW=P` | Bypass | Thermostat direct to boiler via relay; OT-direct inactive. **Not available in this release:** no relay support in the firmware; the answer is `NG`. (`GW=0` is monitor.) |
 | `"2"` or `"S"` | `GW=2` / `GW=S` | Master/Standalone | OTGW32 is the sole OT master; scheduler only, no thermostat expected. OTGW32 extension. |
 | `"M"` | `GW=M` | Monitor | Transparent pass-through; all frames forwarded unmodified. OTGW32 extension. |
 | `"L"` | `GW=L` | Loopback | Internal loopback test mode with simulated boiler responses; no hardware needed. OTGW32 extension. |

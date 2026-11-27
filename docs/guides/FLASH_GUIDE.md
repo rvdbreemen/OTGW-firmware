@@ -1,5 +1,7 @@
 # Flashing the 1.x ESP8266 (not for 2.0.0)
 
+> **Both 2.0 hardware configurations (the OTGW Classic with an ESP32-S3 module and the OpenTherm Gateway OTGW32) are flashed with `flash_otgw`**, see chapter 11 of the manual for the OTGW32.
+>
 > **ESP32-S3 boards (2.0.0 firmware):** this guide covers the ESP8266 and `flash_esp.py` of the 1.x line. ESP32-S3 units are flashed over USB with `flash_otgw.bat` (Windows) or `flash_otgw.sh` (Linux/macOS) from the release zip, and after one USB migration they take firmware updates over WiFi. See [WIFI_FIRMWARE_UPDATE.md](WIFI_FIRMWARE_UPDATE.md).
 
 This guide explains how to use flash_esp.py to flash OTGW-firmware onto your ESP8266 device (NodeMCU or Wemos D1 mini).

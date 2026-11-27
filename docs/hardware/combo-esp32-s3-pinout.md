@@ -10,7 +10,7 @@
 
 Reference pin map for the **combo board** (ADR-125): a single ESP32-S3 binary
 that runs on **either** an OTGW Classic PCB (Wemos D1-mini socket + PIC) **or**
-an OTGW32 (OT-Thing, native OTDirect). The S3 board (LOLIN **S3 Mini** / **S3
+an OTGW32 (native OTDirect). The S3 board (LOLIN **S3 Mini** / **S3
 Mini Pro**) is **pin-compatible with the Wemos D1 mini footprint**, so when it
 sits in the OTGW Classic socket each signal lands on the S3 GPIO at the matching
 footprint hole.
@@ -18,10 +18,10 @@ footprint hole.
 Sources of truth:
 - **OTGW Classic (PIC):** dev branch `boards.h` → `BOARD_NODOSHOP_ESP8266`, plus
   the Wemos D1 mini pin table.
-- **OTGW32 (OTDirect):** OT-Thing OTGW32 hardware → `boards.h`
+- **OTGW32 (OTDirect):** OTGW32 hardware → `boards.h`
   → `BOARD_NODOSHOP_ESP32`.
 - **S3 Mini ↔ D1 mini:** footprint compatibility (shield signals land on the
-  same holes). Cross-checked: OT-Thing's W5500 `SCK/MISO/MOSI = 12/13/11`
+  same holes). Cross-checked: the reference design's W5500 `SCK/MISO/MOSI = 12/13/11`
   equals the S3 Mini's SPI at the D1-mini D5/D6/D7 holes — an independent
   confirmation of the footprint mapping.
 
@@ -38,7 +38,7 @@ holes; the right-hand column is the ESP32-S3 GPIO at each hole.
 | RX | UART0 RX | GPIO3 | **44** | high (LOLIN "RX") |
 | D1 | I2C SCL | GPIO5 | **36** | high (LOLIN "SCL") |
 | D2 | I2C SDA | GPIO4 | **35** | high (LOLIN "SDA") |
-| D5 | SPI SCK | GPIO14 | **12** | high (LOLIN "SCK" = OT-Thing W5500 SCK) |
+| D5 | SPI SCK | GPIO14 | **12** | high (LOLIN "SCK" = reference W5500 SCK) |
 | D6 | SPI MISO | GPIO12 | **13** | high (LOLIN "MISO") |
 | D7 | SPI MOSI | GPIO13 | **11** | high (LOLIN "MOSI") |
 | D8 | SPI SS | GPIO15 | **10** | high (LOLIN "SS", variant `pins_arduino.h`) |
@@ -72,15 +72,16 @@ From dev `boards.h` (`BOARD_NODOSHOP_ESP8266`) + the hole each uses:
 | LED2 | D0 | 16 | **4** (= OTGW32 1-Wire — needs runtime gating if wired) |
 
 > Note: the Classic PCB also carries the external **0x26 I2C watchdog** on the
-> I2C bus. The combo currently runs the ESP32 Task Watchdog instead
-> (`HAS_PIC_WATCHDOG=0`); feeding the 0x26 chip in PIC mode is a known follow-up.
+> I2C bus. The ESP32 Task Watchdog is the primary watchdog; the combo also
+> feeds the 0x26 chip unconditionally (`HAS_PIC_WATCHDOG=1`). On an OTGW32 that
+> feed is a harmless no-op, because the chip is absent.
 
 ---
 
-## 3. OTGW32 (OT-Thing) — ESP32-S3 native, OTDirect
+## 3. OTGW32: ESP32-S3 native, OTDirect
 
 From `boards.h` (`BOARD_NODOSHOP_ESP32`). This is NOT a D1-mini footprint; it is
-the OT-Thing OTGW32 PCB. The combo uses these in **OTDirect mode**.
+the OTGW32 board. The combo uses these in **OTDirect mode**.
 
 | OTGW32 signal | S3 GPIO |
 |---|---|
@@ -111,10 +112,10 @@ so a GPIO shared between the two maps (e.g. **12** = W5500-SCK in OTDirect mode
 | `PIN_PIC_TX` | **43** | PIC | TX hole |
 | `PIN_PIC_I2C_SCL` | **36** | PIC | D1 hole |
 | `PIN_PIC_I2C_SDA` | **35** | PIC | D2 hole |
-| `PIN_I2C_SCL` / `PIN_I2C_SDA` | 17 / 18 | OTDirect | OT-Thing |
-| `PIN_OT_MASTER_IN/OUT` | 21 / 1 | OTDirect | OT-Thing |
-| `PIN_OT_SLAVE_IN/OUT` | 6 / 7 | OTDirect | OT-Thing |
-| W5500 SPI (CS/INT/RST/SCK/MISO/MOSI) | 14/15/16/12/13/11 | OTDirect | OT-Thing |
+| `PIN_I2C_SCL` / `PIN_I2C_SDA` | 17 / 18 | OTDirect | reference hwdef |
+| `PIN_OT_MASTER_IN/OUT` | 21 / 1 | OTDirect | reference hwdef |
+| `PIN_OT_SLAVE_IN/OUT` | 6 / 7 | OTDirect | reference hwdef |
+| W5500 SPI (CS/INT/RST/SCK/MISO/MOSI) | 14/15/16/12/13/11 | OTDirect | reference hwdef |
 
 ### Conflict check (PIC mode pins vs OTGW32 map)
 PIC-mode pins 12/43/44/35/36 vs OTGW32 pins {0,1,2,4,6,7,8,9,10,11,13,14,15,16,

@@ -135,7 +135,9 @@ from the file at create time.
    Known issues, How to report.
    **Structure and language** (TASK-2969 R4; Robert 2026-11-27: always write which builds are in the beta
    and which functions were added, completely, in plain language without programming terms): a short plain head
-   first (about 15 lines: what this beta is, who it is for, how to update, what is not tested), then
+   first (about 15 lines: what this beta is, who it is for, how to update, what is not tested; it names the two supported hardware
+   configurations, the OTGW Classic with an ESP32-S3 module and the OpenTherm Gateway OTGW32, and carries the OTGW32 disclaimer: a new
+   device that still has to prove itself in the field, version 1.0 = first production run, until Robert says otherwise), then
    "Which builds are in this beta" (builds since the previous public beta, and which build was tested overnight), then
    "What is new, in plain words": EVERY user-visible addition, change and fix since the previous public beta, each in 1 to 3 sentences
    a house owner understands (what you notice, when it matters), TASK numbers only as a trailing "(ref: TASK-NNN)", no function, file,

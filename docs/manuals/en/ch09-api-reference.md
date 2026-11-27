@@ -728,7 +728,7 @@ Set OTDirect operating mode.
 |------|----------|-------------|
 | `gateway` | `GW=1` | Full gateway: scheduler + thermostat forwarding + overrides (default) |
 | `monitor` | `GW=0` | Transparent pass-through: all frames forwarded unmodified (PIC parity, TASK-438) |
-| `bypass` | `GW=P` | Thermostat wired directly to boiler via relay; OTDirect inactive |
+| `bypass` | `GW=P` | Thermostat wired directly to boiler via relay; OTDirect inactive. **Not available in this release:** no relay support; the mode falls back to gateway and `GW=P` answers `NG`. |
 | `master` | `GW=S` | Standalone OT master: scheduler only, no thermostat expected |
 | `loopback` | `GW=L` | Internal test: simulated boiler responses, no hardware needed |
 

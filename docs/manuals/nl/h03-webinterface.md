@@ -169,7 +169,7 @@ Op hardware zonder PIC verschijnt een dropdown om de OT-Direct bedrijfsmodus te 
 
 | Modus | Omschrijving |
 |---|---|
-| Bypass | Thermostaat rechtstreeks doorverbonden met de ketel; geen OT-verwerking |
+| Bypass | Thermostaat rechtstreeks doorverbonden met de ketel; geen OT-verwerking. **Niet beschikbaar in deze release:** er is geen relaisondersteuning, kiezen valt terug op gateway. |
 | Gateway | Volledige override-verwerking (standaard) |
 | Monitor | Transparante doorgifte; berichten worden gelogd maar niet gewijzigd |
 | Master / Standalone | Geen thermostaat nodig; de gateway is de enige OT-master |
