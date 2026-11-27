@@ -8274,6 +8274,10 @@ static void satDiagEventsStep(const SatDiagIn& in)
     }
     return;
   }
+  // Q-428a (maintainer entry 501, option A): the 15 min do not run through a tolerance-band pause (the band holds CH off). It restarts the window, so the room
+  // rise never includes the cooling of a pause and a band pause is silent. A PWM OFF phase is not a band pause: it keeps counting. A flag
+  // already set stays until the next full window gives its result. A failure that starts inside a pause is flagged 15 min after CH is asked again.
+  if (in.bandOff) { _sat_hfSinceMs = 0; return; }
   if (_sat_hfSinceMs == 0) { _sat_hfSinceMs = in.now; _sat_hfRoomStart = in.room; return; }
   if ((in.now - _sat_hfSinceMs) < SAT_HF_WINDOW_MS) return;
   const float rise = in.room - _sat_hfRoomStart;
@@ -8899,6 +8903,7 @@ static void satControlLoopRun()
     d.now = _sat_tickMs;
     d.intervalMs = (uint32_t)settings.sat.iControlInterval * 1000UL;
     d.chAsked = !coldCutoff && satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn, _sat_tolBandOff);   // TASK-3034: the CH decision satSendCH sends, band included
+    d.bandOff = _sat_tolBandOff;
     d.flame = satIsFlameOn();
     d.flowAboveCs = satGetFlowTemp() >= finalSetpoint;
     d.atMax = atMax || (pwmMode && satPwmInMaxDutyRange());   // TASK-2992: range 5, not the narrower MM=T release

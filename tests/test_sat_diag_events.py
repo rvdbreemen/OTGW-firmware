@@ -68,7 +68,7 @@ static void DebugTln(const char* s) { g_log += s; g_log += "\n"; }   // TASK-188
 static void satNarratef_P(const char* f, ...) { char b[256]; va_list a; va_start(a, f); vsnprintf(b, sizeof b, f, a); va_end(a); g_log += "N:"; g_log += b; g_log += "\n"; }
 @@CUT@@
 static SatDiagIn in0(uint32_t now) {
-  SatDiagIn d; d.now = now; d.intervalMs = 30000; d.chAsked = false; d.flame = false; d.flowAboveCs = false;
+  SatDiagIn d; d.now = now; d.intervalMs = 30000; d.chAsked = false; d.bandOff = false; d.flame = false; d.flowAboveCs = false;
   d.atMax = false; d.roomValid = true; d.room = 19.0f; d.cs = 45.0f; d.maxSetpoint = 62.0f; d.duty = 0.0f; return d;
 }
 int main(int argc, char** argv) {
@@ -103,9 +103,27 @@ int main(int argc, char** argv) {
     if (c == "hf_60") risePerWindow = 0.6f;
     if (c == "hf_below") atMax = false;
     if (c == "hf_invalid") invalid = true;
-    for (int i = 0; i < 70; i++, t += 30000) {                // 35 min
+    // Q-428a (entry 501): the window counts only while SAT has CH enabled. "hf_band": CH asked for 20 ticks, a 10-tick tolerance-band
+    // pause (CH not asked) in which the room cools by 0.6 C, then CH asked again; the asked time itself rises 0.6 C per 15 min.
+    // "hf_hold": a real failure is flagged, then a band pause: the flag stays.
+    const bool band = (c == "hf_band"), hold = (c == "hf_hold");
+    if (band) risePerWindow = 0.6f;
+    const int N = band ? 90 : (hold ? 50 : 70);
+    float room = 19.0f;
+    for (int i = 0; i < N; i++, t += 30000) {                // 35 min
       SatDiagIn d = in0(t); d.atMax = atMax; d.roomValid = !(invalid && i == 20);
-      d.room = 19.0f + risePerWindow * (float)i / 30.0f;      // 30 ticks = 15 min
+      d.chAsked = true;
+      if (band) {
+        const bool pause = i >= 20 && i < 30;
+        d.chAsked = !pause; d.bandOff = pause;
+        room += pause ? -0.06f : risePerWindow / 30.0f;
+        d.room = room;
+      } else if (hold) {
+        d.chAsked = i < 35; d.bandOff = i >= 35;
+        d.room = 19.0f + 0.2f * (float)(i < 35 ? i : 35) / 30.0f;
+      } else {
+        d.room = 19.0f + risePerWindow * (float)i / 30.0f;    // 30 ticks = 15 min
+      }
       satDiagEventsStep(d);
       if (state.sat.bHeatingFailure && firstTick < 0) firstTick = i;
     }
@@ -189,6 +207,16 @@ class DiagEvents(unittest.TestCase):
         r, log = self.run_case("hf_60")
         self.assertEqual((r["first"], r["events"]), ("-1", "0"))
         self.assertIn("SATEVENT heating_failure=0 room_start=19.00", log, "every window is logged with its numbers")
+
+    def test_a_band_pause_cooling_is_not_a_heating_failure_q428a(self):
+        # Q-428a, entry 501: the window counts only CH-asked time. The room rises 0.6 C per 15 min while CH is asked and cools 0.6 C in
+        # a 10-tick band pause. Old code: the window spans the pause, the net rise is below 0.5 C, so it flags a failure at tick 30.
+        r, log = self.run_case("hf_band")
+        self.assertEqual((r["first"], r["events"], r["active"]), ("-1", "0", "0"))
+
+    def test_a_flagged_failure_stays_through_a_band_pause_q428a(self):
+        r, _ = self.run_case("hf_hold")
+        self.assertEqual((r["first"], r["active"], r["events"]), ("30", "1", "1"))
 
     def test_below_the_maximum_or_an_invalid_room_gives_none(self):
         self.assertEqual(self.run_case("hf_below")[0]["events"], "0")
