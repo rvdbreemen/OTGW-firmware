@@ -8,6 +8,8 @@
 
 <!-- Refreshed 2026-11-20 against dev at beta.401 (TASK-1740, 95): beta.383 to beta.401 checked per bump; added TASK-2043 (beta.386), TASK-2023 (beta.387), TASK-2914 (beta.392), TASK-2923 (beta.394), TASK-2037 (beta.396), TASK-2928 (beta.399), TASK-2932 (beta.400); beta.395 fixes the beta.393 chip itself, beta.397 and beta.398 touch prerelease debug keys only (no change in a stable build). New section Remote telemetry (TASK-2937, not on dev yet). Refreshed again 2026-11-20 for beta.402 (TASK-2946) and the CONTRIBUTORS.md highlight (TASK-2947). Highlight graph history corrected from 24 hours to 7 days (TASK-1963, ADR-245). -->
 
+<!-- Refreshed 2026-11-27 (otgw-docs) against dev at beta.474: OTGW32 version wording (Version 1.0 is the first production run), remote telemetry section rewritten from the approved dialog text, ADR-298 table and upgrade paths, Known issues carry-over. Local draft, not pushed. -->
+
 <!-- Review (95, 2026-11-20): stable date moved to Sunday 29 November 2026 (Robert "A", DM 1573294949347233795): the MQTT pacer consolidation and the switch to our espMqttClient fork (rvdbreemen/espMqttClient as the dependency) go into 2.0.0. Both are placeholders below until their bench OK. -->
 
 **Status:** draft, not released. **Planned:** Sunday 29 November 2026. **Branch:** dev. **Compared with:** the 1.x line (latest stable v1.7.9).
@@ -19,7 +21,7 @@
 **Supported hardware:** exactly two configurations. Use the combo image (`esp32-combo`) for both.
 
 1. **The OTGW Classic with an ESP32-S3 module** (a LOLIN S3 Mini or S3 Mini Pro in the module socket). The PIC stays in place and talks OpenTherm.
-2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself (OT-Direct), without a PIC. Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware.
+2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself (OT-Direct), without a PIC. Version 1.0 of the OTGW32 is the first production run. The firmware does not use a bypass relay.
 
 Everything the gateway is for (OpenTherm, MQTT, Home Assistant, SAT) works on the OTGW32. A few optional extras (Bluetooth sensors, long graph history, bigger buffers) need PSRAM (extra working memory) and are off on this board.
 
@@ -67,18 +69,17 @@ Without SAT, the gateway behaves as a transparent OpenTherm gateway, as in 1.x.
 
 ## Remote telemetry is opt-in and off by default
 
-<!-- Review (95, 2026-11-20): written from ADR-263, the approved onboarding text in v2.js (I18N_EN.rtel) and the TASK-2937 commits ce95a638f and 1a0ea6302 on lane-5e-adr. Those commits are not on dev yet: keep this section only if TASK-2937 lands before the stable tag. To be matched with 92's text. -->
+<!-- Rewritten 2026-11-27 (otgw-docs) from the approved dialog text (draft 2, English) and ADR-302 (Proposed). It must say nothing stronger than the dialog the stable ships: re-check against the consent text and the field list at the release commit. Experimental label stays while the feature is experimental. -->
 
-Remote telemetry helps make the firmware better. It is **off by default** and nothing is sent until you turn it on yourself.
+Remote telemetry sends a diagnostic recording from your gateway to a server of the firmware maker, so we can see real systems and not only our test bench. It is **off by default**: nothing is sent until you say yes. It is experimental and only for boards with PSRAM (extra memory).
 
-- **Where you choose:** the last step of the setup wizard asks; on a gateway that is already set up, a one-time question asks once ("No, keep it off" is the default). You can change it at any time under **Settings > General** ("Send remote telemetry").
-- **What is sent:** OpenTherm messages, the decisions of the SAT control, firmware error messages and your settings. These also include the weather location, the name of your gateway and the room temperature. Passwords and tokens are never sent. Your gateway is recognisable by a device ID, not by your name.
-- **How:** encrypted, via Cloudflare to the maker's NAS, in the Netherlands.
-- **How long:** deleted automatically after 30 days.
-- **What for:** only for improving and validating the firmware.
-- **Off means off:** when you turn it off, the gateway stops sending and drops what it had not sent yet. The choice is stored on the gateway itself, not in `settings.ini`.
-- **Boards with PSRAM only.** Remote telemetry needs a board with PSRAM (ADR-263). On a board without PSRAM the wizard does not offer it and the switch is disabled with "Needs a board with PSRAM".
-- **Status in the header:** while it is on, a badge shows "Telemetry online", "Telemetry paused" or "Telemetry offline". While it is off, there is no badge.
+- **Where you choose:** a dialog asks once; a "No" is final. You can switch it on or off at any time under **Settings > System > Remote telemetry**; turning it off stops sending at once.
+- **What is sent:** OpenTherm messages between thermostat and boiler, the decisions of the SAT control, firmware error and debug lines, and gateway events such as setting changes, MQTT and REST traffic, and weather and sensor readings. Settings are sent as numbers and on/off values; text values only as "set" or "empty". A weather location is rounded to about 11 km. The dialog also lists what can still be in the data; read it before you say yes.
+- **Where it goes:** a server of the firmware maker (a NAS at the maker's home), over an encrypted connection that passes through Cloudflare's network, which can technically see it in transit.
+- **How long:** deleted from the server after 30 days.
+- **Your gateway** is recognised by an ID that cannot be traced back to its MAC address, not by your name.
+- **Boards without PSRAM:** the setting is greyed out and nothing is ever sent.
+- **To have your data deleted** [ASK: Robert confirms the channel]: quote your telemetry ID in a GitHub issue or on the Discord support channel.
 
 ---
 
@@ -95,6 +96,13 @@ curl http://<ip>/api/v2/settings -o settings-backup.json
 - **A new S3 Mini, or a unit on 1.x or on an old partition layout, needs a USB first flash with `flash_otgw`.** For a unit that holds settings the tool saves them, writes the new layout, keeps your WiFi credentials and restores the settings. Windows: `flash_otgw.bat --migrate --host <ip>`. Linux/macOS: `./flash_otgw.sh --migrate --host <ip>`. See the README and the [WiFi firmware update guide](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/guides/WIFI_FIRMWARE_UPDATE.md).
 - **A unit that already runs 2.0.0** (beta.1 or later, or a 2.0.0 alpha with the safeboot layout) **updates over WiFi with the flash zip.** Open `/update`, give it the release zip and press **Update**. The page runs the whole sequence: firmware through the safeboot updater, then the filesystem. Settings are kept. Let it finish: this build expects the new filesystem with the gzipped pages. Between the two steps it serves the plain page of the old filesystem.
 - Coming from 1.x: this is a different firmware line. Settings and the web UI differ. Read the breaking changes below.
+
+**2b. Upgrade paths to the stable** [verify each path on a bench unit before the release]:
+
+- **From 1.x (ESP8266):** a different firmware line. The ESP8266 board is replaced by an ESP32-S3 module (LOLIN S3 Mini or S3 Mini Pro); first flash over USB with `flash_otgw`. Settings do not carry over automatically; read the breaking changes below.
+- **From a 2.0.0 beta on the 2240 KB table** (every beta up to the one that brings the new table): one USB migration with `flash_otgw --migrate --host <ip>` (Windows `flash_otgw.bat`, Linux and macOS `./flash_otgw.sh`). Over-the-air update alone is not enough: the new firmware on the old table keeps your settings but warns at boot and in `/update`, and the file-system step is refused. [verify: the bridge beta with the guards, ADR-298 release order]
+- **From the beta that already has the new table:** open `/update`, give it the release zip, press **Update**.
+- **Going back:** a migrated unit is rolled back only with the old release's full merged image over USB, never with the old tool's `--update`.
 
 **3. Interrupted filesystem upload.** If the filesystem upload stops part-way, the settings are no longer lost. The gateway wipes the filesystem, writes your settings back from memory and asks you to upload the filesystem again. Until you do, it serves a fallback page with the file explorer upload (`device/info` reports `fsupdateincomplete`).
 
@@ -177,7 +185,7 @@ The items below changed during the 2.0.0 alphas and betas; most concern SAT, whi
 
 - **The classic web UI is removed; v2 is the only web UI** (ADR-192). The UI switch and the classic-only `ui_*` settings are gone. The File Explorer is the recovery page.
 - **Classic UI features not in v2:** the UI switch button; the heap footer; log persistence across page reloads; resizable table columns; the 8-option graph window list; graph disconnect markers; auto-hiding the log on small screens; the `otgwDebug` console helper; the design showcase page; WiFi network scan (the REST endpoint `GET /api/v2/network/scan` stays); the classic display preferences; weather location auto-fill and the OpenWeatherMap key wizard.
-- **New flash layout on 4 MB boards** (ADR-191): safeboot 960 KB, firmware 2240 KB, filesystem 768 KB. "Every unit needs one USB migration."
+- **New flash layout on 4 MB boards** (ADR-191, then ADR-298): safeboot 960 KB, firmware 2304 KB, filesystem 704 KB [verify at the tag: the 2304 KB table ships in the beta of 30 Nov and is in the stable]. Every unit that still has the 2240 KB table needs one USB migration (`flash_otgw --migrate --host <ip>`); settings.ini and dallas_labels.ini are saved first and restored, WiFi stays, other files on the filesystem are lost.
 - **GPIO output and webhook trigger-bit labels** were the wrong way round in the v2 settings page. Stored values are unchanged, so check the select after the update.
 
 ---
@@ -357,6 +365,11 @@ These are design limits of 2.0.0, not bugs.
 
 ## Known issues
 
+<!-- Carry-over from the beta.474 notes (2026-11-27, otgw-docs): re-check each item at the release commit. -->
+- **WiFi packet loss and failing filesystem updates while BLE scanning is on** (TASK-3126). On a Classic with an S3 module, BLE scanning can cause WiFi packet loss; a filesystem update over WiFi failed 5 of 5 times with BLE on in our tests (one unit). If an update fails, turn off "Enable BLE sensors" under Settings > Sensors, reboot, repeat the update.
+- **The web interface can be unreachable for up to about 3 minutes after a severe low-memory event** (TASK-3025, TASK-3119, TASK-3123). It recovers by itself; on a board without extra memory open pages can reconnect repeatedly. Close extra tabs.
+- **Memory dip in the first minutes after a start on a unit without extra memory** (TASK-3024).
+- **The retained state echo of the SAT settings topics** (`sat/weather_lat`, `sat/weather_lon`, `sat/zone_count` and the other static `sat/*` settings) is published only once SAT is not held back by its start gates: the first 60 seconds after boot, a lost OpenTherm link, or a missing outside temperature (TASK-3129). Setting them over MQTT or REST still works.
 - **Most settings help pop-ups are in English in Dutch, German and Greek** (TASK-2927). The rest of the web UI is translated, and every help text falls back to English, so no help is missing. The translation follows in 2.1.0 (Robert's decision, 2026-11-19).
 
 - **Under investigation: once, a bench unit hung after a crash restart** (TASK-2911). It was on WiFi with an address, but did not answer ping, the web UI or telnet for 8 minutes, until a USB reset; the cause is not known. Normal restarts on that unit worked 5 of 5 times. The WiFi self-recovery only starts after the gateway's router answered once since the start, so it does not cover this case. If your gateway is on WiFi but unreachable after a restart, please tell us.
