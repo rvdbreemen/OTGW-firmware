@@ -61,6 +61,8 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bPaceDrip              = true;   // ADR-265 cut 2 (TASK-2949.7): false = the discovery drip waits on its own outbox threshold; settable only in prerelease builds, RAM only
   bool     bPaceConn              = true;   // ADR-265 cut 3 (TASK-2949.8): false = the connect portions decide on their own outbox and block thresholds; prerelease only, RAM only
   bool     bPaceTail              = true;   // ADR-265 cut 4 (TASK-2949.9): false = the stale override sweep and the hourly stats without the pacer; prerelease only, RAM only
+  bool     bWsCooldown            = true;   // TASK-3123 lane A: false = no 30 s /ws handshake cooldown after a recovery (arm without it); prerelease only, RAM only
+  bool     bWsAbort               = true;   // TASK-3119 lane A: false = a refused /ws handshake gets the library 401 (arm without the abort); prerelease only, RAM only
   uint32_t iOTGWSimulationIntervalMs = 750;
   uint32_t iOTGWSimulationNextDueMs  = 0;
   uint8_t  iRestCap                  = 2;       // TASK-3091: the REST in-flight cap override (2..8); read only in prerelease builds (restAPI.ino), RAM only; 2 = ADR-165 as shipped

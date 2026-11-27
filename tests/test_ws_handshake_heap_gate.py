@@ -97,7 +97,7 @@ class HandshakeGate(unittest.TestCase):
         self.assertLess(body.index("otLogWs.handleHandshake("), body.index("server.addHandler(&otLogWs)"))
         # the handler takes its decision from wsAdmitHandshake(), with the live heap and the connected count
         handler = cut(self.src, "static bool wsHandshakeHandler(")
-        self.assertIn("wsAdmitHandshake(freeHeap, connected, now, g_wsRecoveryMs)", handler)
+        self.assertIn("wsAdmitHandshake(freeHeap, connected, now, lastRec)", handler)
         self.assertIn("platformFreeHeap()", handler)
         self.assertIn("otLogWs.count()", handler)
 

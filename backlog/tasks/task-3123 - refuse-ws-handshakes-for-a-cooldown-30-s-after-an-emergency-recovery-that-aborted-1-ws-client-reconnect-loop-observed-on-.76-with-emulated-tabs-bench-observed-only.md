@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-27T12:37:00Z'
-updated_date: '2026-11-27T13:25:00Z'
+updated_date: '2026-11-27T13:34:00Z'
 labels:
   - webui
   - heap
@@ -37,4 +37,6 @@ After emergencyHeapRecovery() aborts the /ws clients (ADR-295), the browser tabs
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-27 otgw-dev: implemented locally on lane/ws-cooldown (wt-d3-cool, on top of 3f9176298 + a merge of origin/dev), not built, not pushed. wsAdmitHandshake(freeHeap, connected, nowMs, lastRecoveryMs) refuses while (uint32_t)(now - lastRecoveryMs) < WS_RECOVERY_COOLDOWN_MS (30000); 0 = no recovery yet; emergencyHeapRecovery() calls webSocketNoteRecoveryAbort() only inside the branch where doWebSocketDisconnectAll() aborted >= 1 client (AC2); the handler counts the refusal as its own burst event WS_BURST_REJECTED_COOLDOWN and logs 'refused at the handshake (recovery cooldown, N s left)' (AC3). tests/test_ws_handshake_cooldown.py (7 tests): REAL functions on the host: refuses at +0 and +29.9 s, admits at +30 s, admits with no recovery, wrap across 2^32, old rules after the cooldown, mutant with 0 ms cooldown red, wiring guards; red before (functions absent). test_ws_handshake_heap_gate updated for the new signature. evaluate --quick 0 failed. NOT done: AC5 bench (n=3 on .76, control run before). The cooldown refuses through the library 401 path (see the gate-abort discussion): this lane does not include 2404fb9ae.
+
+2026-11-27 otgw-dev: lane A (lane/ws-lowmem, wt-d3-cool, local, not built): the cooldown and the gate abort (from 2404fb9ae, re-written into the new handler) are runtime arms in prerelease builds: telnet m = wscool, t = wsabort (REST names wscool, wsabort), RAM only, both ON at boot; a release build has no switch and runs both. tests/test_ws_handshake_lowmem_arms.py compares the REAL new handler with the REAL B1 handler (3f9176298, via git show) on a grid: both off = byte-identical output and no abort; abort only = identical plus one abort per refusal; cooldown only = own burst event and text inside 30 s, identical outside; release build ignores the switches; mutant (abort arm stuck on) red. K-hook question: the K bench hook only drives free heap under 3072, the recovery then runs through the same emergencyHeapRecovery() (OTGW-firmware.ino:1109), so the cooldown applies to K-induced recoveries when they aborted >= 1 /ws client. User-visible effect: after a recovery that closed the web UI's live link, a browser tab cannot reconnect for 30 s (the page shows its reconnect banner and retries every 5 s); a recovery that did not touch /ws changes nothing.
 <!-- SECTION:NOTES:END -->

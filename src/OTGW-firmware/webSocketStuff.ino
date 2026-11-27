@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-beta.460
+**  Version  : v2.0.0-beta.461
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -304,21 +304,46 @@ static bool wsAdmitHandshake(uint32_t freeHeap, uint16_t connected, uint32_t now
   return true;
 }
 
-static bool wsHandshakeHandler(AsyncWebServerRequest*) {
+// Lane A bench arms (prerelease builds only, RAM only, both on at boot): telnet keys m (wscool) and t (wsabort), REST names wscool and wsabort.
+// A release build has no switch and always runs both measures. With a switch off the handler behaves exactly like the handler of the
+// send-guard build 3f9176298 (tests/test_ws_handshake_lowmem_arms.py compares the two on a grid, byte for byte).
+static bool wsCooldownArmed() {
+#if defined(_VERSION_PRERELEASE)
+  return state.debug.bWsCooldown;
+#else
+  return true;
+#endif
+}
+static bool wsAbortArmed() {
+#if defined(_VERSION_PRERELEASE)
+  return state.debug.bWsAbort;
+#else
+  return true;
+#endif
+}
+static bool wsHandshakeHandler(AsyncWebServerRequest* request) {
   const uint32_t freeHeap = platformFreeHeap();
   const uint16_t connected = (uint16_t)otLogWs.count();
   const uint32_t now = millis();
-  if (wsAdmitHandshake(freeHeap, connected, now, g_wsRecoveryMs)) return true;
-  const uint32_t leftMs = wsCooldownLeftMs(now, g_wsRecoveryMs);
+  const uint32_t lastRec = wsCooldownArmed() ? g_wsRecoveryMs : 0;
+  if (wsAdmitHandshake(freeHeap, connected, now, lastRec)) return true;
+  const uint32_t leftMs = wsCooldownLeftMs(now, lastRec);
   if (leftMs > 0) {
     noteWebSocketBurstEvent(WS_BURST_REJECTED_COOLDOWN);
     DebugTf(PSTR("[%lu] WebSocket: refused at the handshake (recovery cooldown, %lu s left)\r\n"),
             (unsigned long)now, (unsigned long)((leftMs + 999UL) / 1000UL));
-    return false;
+  } else {
+    noteWebSocketBurstEvent(freeHeap < HEAP_WARNING_THRESHOLD ? WS_BURST_REJECTED_HEAP : WS_BURST_REJECTED_MAX);
+    DebugTf(PSTR("[%lu] WebSocket: refused at the handshake (free heap %u, %u connected)\r\n"),
+            (unsigned long)now, (unsigned)freeHeap, (unsigned)connected);
   }
-  noteWebSocketBurstEvent(freeHeap < HEAP_WARNING_THRESHOLD ? WS_BURST_REJECTED_HEAP : WS_BURST_REJECTED_MAX);
-  DebugTf(PSTR("[%lu] WebSocket: refused at the handshake (free heap %u, %u connected)\r\n"),
-          (unsigned long)now, (unsigned)freeHeap, (unsigned)connected);
+  // The refusal ends the connection with a RST: tcp_abort() queues nothing and frees the pcb at once. Returning false alone makes the
+  // library build and write a 401 through a path that does not pass webBeginRequest() (no send cap, no ADR-189 abort on the ack
+  // timeout, graceful close, rx timeout 0): at a floor heap that answer can stay unsent and hold a half-closed connection (bench
+  // 2026-11-27, 455: :80 and :23 silent for about 54 s after the hold; mechanism inferred, the lane A arms decide it). After the abort
+  // AsyncClient::add() writes nothing (pcb is NULL), so the 401 the library still creates is never sent. Not request->abort(): it sets
+  // _sent, and the library's send(401) would then drop its response object without deleting it.
+  if (wsAbortArmed() && request && request->client()) request->client()->abort();
   return false;
 }
 

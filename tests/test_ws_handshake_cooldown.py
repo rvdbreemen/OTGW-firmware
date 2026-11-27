@@ -130,7 +130,7 @@ class Wiring(unittest.TestCase):
         h = cut(s, "static bool wsHandshakeHandler(")
         self.assertIn("WS_BURST_REJECTED_COOLDOWN", h)
         self.assertIn("recovery cooldown", h)
-        self.assertIn("wsAdmitHandshake(freeHeap, connected, now, g_wsRecoveryMs)", h)
+        self.assertIn("wsAdmitHandshake(freeHeap, connected, now, lastRec)", h)
 
 
 if __name__ == "__main__":
