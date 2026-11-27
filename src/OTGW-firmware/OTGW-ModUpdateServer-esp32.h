@@ -681,40 +681,46 @@ private:
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
       }
-      // TASK-1771: RAM may replace the heap copies at the restore only when SAT had loaded its files before
-      // this write. An upload that starts in setup() before initSAT() unmounts LittleFS below, so an
-      // initSAT() during the write reads nothing and holds defaults (bench .61: preset and energy lost).
-      _satLoadedAtFsStart = satStateLoaded();
-      // TASK-1989/2007: queued state writes reach the files before they are copied to the heap. The writer stays
-      // paused from here until bFsImageWriting holds it, so no write runs between the copy and LittleFS.end().
-      if (!fsWriterPauseAndFlush(2000)) DebugTln(F("[OTA] fswriter: still busy after 2 s"));
-      _keepFiles();   // TASK-1266/1286: the image lacks these files; copy them to the heap, restore after the remount
-      fsOtaRtcFill();   // TASK-1774: survives a reset during the write; armed at the first chunk
-      LittleFS.end();
-      ::state.flash.bFsImageWriting = true;   // TASK-1909: no LittleFS.begin() elsewhere until the remount below
-      fsWriterResume();   // TASK-2007: bFsImageWriting holds the writer from here; the remount pauses it again until the restore
+      // ADR-298 / TASK-2980: every refusal that needs only the query string and the partition size is decided HERE,
+      // before the writer is paused, before the runtime files are copied, before the RTC snapshot and before
+      // LittleFS.end(). Bench .76 (beta.482, old table): a refusal after LittleFS.end() left the filesystem
+      // unmounted (the completion handler's remount is gated on LittleFSmounted, which the start keeps true), so the
+      // web UI, version.hash and settings.ini were unreadable until a reboot. A refusal now touches nothing.
+      const char *fsRefusal = nullptr;
       if (uploadTotal == 0) {
-        // ADR-298: without size= the image cannot be compared with this unit's partition before it is written, and an
-        // image built for another table does not mount afterwards (settings.ini unreadable). The /update page, the
+        // Without size= the image cannot be compared with this unit's partition before it is written, and an image
+        // built for another table does not mount afterwards (settings.ini unreadable). The /update page, the
         // scripts and the documented curl calls send size=<bytes>.
-        strlcpy(_updaterError, "filesystem upload needs size=<bytes> in the query string (POST /update?cmd=100&size=<bytes>)", sizeof(_updaterError));
-        _dropKeptFiles();
-        fsOtaRtcWipe();
+        fsRefusal = "filesystem upload needs size=<bytes> in the query string (POST /update?cmd=100&size=<bytes>)";
       } else if (uploadTotal > fsSize) {
-        strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
-        _dropKeptFiles();   // the old filesystem is untouched; the copies are not needed
-        fsOtaRtcWipe();
+        fsRefusal = "filesystem image too large";
       } else if (uploadTotal < fsSize) {
-        // ADR-298: a mklittlefs image spans the whole partition, so a smaller one was built for another table. Written
+        // A mklittlefs image spans the whole partition, so a smaller one was built for another table. Written
         // here it would not mount (littlefs checks the block count against the partition: lfs.c "Invalid block count"),
         // and the web files and settings.ini would be unreadable. Refuse before any write; the old filesystem stays.
-        strlcpy(_updaterError, "filesystem image does not match this unit's partition layout: migrate once over USB (flash_otgw --migrate)", sizeof(_updaterError));
-        _dropKeptFiles();
-        fsOtaRtcWipe();
-      } else if (!Update.begin(fsSize, U_SPIFFS)) {  // U_SPIFFS covers LittleFS on ESP32
-        _setUpdaterError();
-        _dropKeptFiles();
-        fsOtaRtcWipe();
+        fsRefusal = "filesystem image does not match this unit's partition layout: migrate once over USB (flash_otgw --migrate)";
+      }
+      if (fsRefusal) {
+        strlcpy(_updaterError, fsRefusal, sizeof(_updaterError));
+        if (_serial_output) DebugTf(PSTR("[OTA] Refused before touching LittleFS: %s\r\n"), fsRefusal);
+      } else {
+        // TASK-1771: RAM may replace the heap copies at the restore only when SAT had loaded its files before
+        // this write. An upload that starts in setup() before initSAT() unmounts LittleFS below, so an
+        // initSAT() during the write reads nothing and holds defaults (bench .61: preset and energy lost).
+        _satLoadedAtFsStart = satStateLoaded();
+        // TASK-1989/2007: queued state writes reach the files before they are copied to the heap. The writer stays
+        // paused from here until bFsImageWriting holds it, so no write runs between the copy and LittleFS.end().
+        if (!fsWriterPauseAndFlush(2000)) DebugTln(F("[OTA] fswriter: still busy after 2 s"));
+        _keepFiles();   // TASK-1266/1286: the image lacks these files; copy them to the heap, restore after the remount
+        fsOtaRtcFill();   // TASK-1774: survives a reset during the write; armed at the first chunk
+        LittleFS.end();
+        ::state.flash.bFsImageWriting = true;   // TASK-1909: no LittleFS.begin() elsewhere until the remount below
+        fsWriterResume();   // TASK-2007: bFsImageWriting holds the writer from here; the remount pauses it again until the restore
+        if (!Update.begin(fsSize, U_SPIFFS)) {  // U_SPIFFS covers LittleFS on ESP32
+          _setUpdaterError();
+          _dropKeptFiles();
+          fsOtaRtcWipe();
+        }
       }
     } else {
       _uploadTarget = UploadTarget::Firmware;

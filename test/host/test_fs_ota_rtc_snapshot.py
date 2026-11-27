@@ -169,7 +169,10 @@ def static_cases(src):
     restore = method_body(upd, r"^  void _restoreRuntimeFiles\(")
     s1, p1 = order(start, "_keepFiles();", "fsOtaRtcFill();", "LittleFS.end();")
     s2, p2 = order(write, "Update.write(data, len)", "_uploadWrittenBytes += written;", "fsOtaRtcArm();")
-    too = re.search(r'"filesystem image too large"[^}]*fsOtaRtcWipe\(\);', start, re.S)
+    # ADR-298 / TASK-2980: the refusals that need only size= and the partition size are decided BEFORE the snapshot is filled
+    # (nothing to wipe, LittleFS stays mounted); only a failed Update.begin() still wipes a filled snapshot.
+    too = ("fsRefusal = \"filesystem image too large\"" in start and "fsOtaRtcFill();" in start
+           and start.index("fsRefusal = \"filesystem image too large\"") < start.index("fsOtaRtcFill();"))
     beg = re.search(r"!Update\.begin\(fsSize, U_SPIFFS\)\)\s*\{[^}]*fsOtaRtcWipe\(\);", start, re.S)
     early_arm = "fsOtaRtcArm" in start
     s4 = re.search(r"if \(saved\) fsOtaRtcWipe\(\);", restore) and restore.count("fsOtaRtcWipe") == 1
@@ -189,8 +192,8 @@ def static_cases(src):
         "S1": ("pass" if s1 else "FAIL", "_handleUploadStart() fills after _keepFiles() and before LittleFS.end()", str(p1)),
         "S2": ("pass" if s2 and not early_arm else "FAIL", "_handleUploadWrite() arms after a successful chunk write",
                f"{p2}, arm in upload start: {'yes' if early_arm else 'no'}"),
-        "S3": ("pass" if too and beg else "FAIL", "the refusals before any write wipe the snapshot",
-               f"too large {'wipes' if too else 'no wipe'}, begin failed {'wipes' if beg else 'no wipe'}"),
+        "S3": ("pass" if too and beg else "FAIL", "the refusals before any write leave no snapshot behind",
+               f"too large {'decided before the fill' if too else 'after the fill'}, begin failed {'wipes' if beg else 'no wipe'}"),
         "S4": ("pass" if s4 else "FAIL", "_restoreRuntimeFiles() wipes only after a successful settings write",
                "if (saved) fsOtaRtcWipe() once" if s4 else "missing or unconditional"),
         "S5": ("pass" if s5 else "FAIL", "writeSettings() drops the settings slot after a successful commit", str(p5)),

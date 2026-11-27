@@ -177,19 +177,19 @@ class FirmwareOtaPath(unittest.TestCase):
 
     def test_a_filesystem_image_smaller_than_the_partition_is_refused_before_any_write(self):
         text = HDR.read_text(encoding="utf-8")
-        m = re.search(r"\} else if \(uploadTotal < fsSize\) \{(.*?)\} else if \(!Update\.begin\(fsSize", text, re.S)
+        m = re.search(r"\} else if \(uploadTotal < fsSize\) \{(.*?)\}\n      if \(fsRefusal\)", text, re.S)
         self.assertIsNotNone(m, "no refusal of an image that is smaller than the partition (another table's image)")
-        self.assertIn("_dropKeptFiles();", m.group(1))
-        self.assertIn("fsOtaRtcWipe();", m.group(1))
-        self.assertIn("_updaterError", m.group(1))
+        self.assertIn("fsRefusal = ", m.group(1))
+        # the refusal is decided before anything is copied, snapshotted or unmounted (bench .76: LittleFS stayed unmounted otherwise)
+        self.assertLess(text.index("fsRefusal = \"filesystem image does not match"), text.index("_keepFiles();   // TASK-1266"))
 
     def test_a_filesystem_upload_without_size_is_refused_before_any_write(self):
         text = HDR.read_text(encoding="utf-8")
         m = re.search(r"if \(uploadTotal == 0\) \{(.*?)\} else if \(uploadTotal > fsSize\)", text, re.S)
         self.assertIsNotNone(m, "an upload without size= can be written unchecked (ADR-298 review F2)")
         self.assertIn("size=", m.group(1))
-        self.assertIn("_dropKeptFiles();", m.group(1))
-        self.assertIn("fsOtaRtcWipe();", m.group(1))
+        self.assertIn("fsRefusal = ", m.group(1))
+        self.assertLess(text.index("fsRefusal = \"filesystem upload needs size="), text.index("_keepFiles();   // TASK-1266"))
 
     def test_the_app_image_carries_the_layout_it_is_built_for(self):
         text = HDR.read_text(encoding="utf-8")
