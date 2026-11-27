@@ -25,14 +25,18 @@ lives here.
 | 2026-10-29 | Open questions go to Robert interactively with a weighed recommendation | CLAUDE.md "Design Principles" |
 | 2026-10-30 | Per-task cadence: bench-test every firmware task before its zip is published (since 2026-11-11 the bench-tester agent runs that bench test) | `docs/guides/agent-build-and-bench.md`, CLAUDE.md summary |
 | 2026-11-01 | `release/2.x` is the stable 2.x line (TASK-1545) | CLAUDE.md "Git push policy" |
-| 2026-11-14 | Standing permission for 2.x public betas: the coordinator invokes `/beta-release-2x` itself in the 08:00/20:00 slot; stable releases keep the per-action yes (TASK-1948) | AGENT-CORE block (hard-stop exception), `.claude/skills/beta-release-2x/SKILL.md` (model invocation allowed) |
+| 2026-11-14 | Standing permission for 2.x public betas: the coordinator invokes `/beta-release-2x` itself in its publish window (since 2026-11-27: at most one public beta per 3 hours, 07:00 to 22:00); stable releases keep the per-action yes (TASK-1948) | AGENT-CORE block (hard-stop exception), `.claude/skills/beta-release-2x/SKILL.md` (model invocation allowed) |
 | 2026-11-16 | 2.0.0 stable gate = TASK-1740 (entry-386 criterion, target Sat 21 Nov if the Wed-Fri field runs are clean); the SAT low-load epic TASK-1412 and its full gate move to 2.1.0, 2.0.0 keeps only TASK-1412.24 (field-run request), TASK-1412.25 (the Wed-Fri runs) and the host LL contract (Robert, DM 1571910380756668488) | TASK-1740, TASK-1412 |
 | 2026-11-20 | Explain the number, and sequence verifiable units (from the pstack principles) | CLAUDE.md and AGENTS.md "Design Principles" |
+| 2026-11-27 | Public betas: at most one per 3 hours, published between 07:00 and 22:00 (T = publish time); everything else of the flow stays (docs-only release commit at T-75, 60 min soak on the exact binary, one cause per beta). Robert: "Je mag publieke beta's uitbrengen elke 3 uur gedurende de dag. Dat is tussen 7 en 22 uur." | `.claude/skills/beta-release-2x/SKILL.md` (CHECKPOINT 1), AGENT-CORE block hard-stop exception |
+| 2026-11-27 | Beta release notes: always say which builds are in the beta and what was added, completely, in plain language without programming terms; short plain head first, per-range test provenance in an appendix (TASK-2969 R4) | `.claude/skills/beta-release-2x/SKILL.md` (Phase 1) |
+| 2026-11-27 | The OpenTherm Gateway OTGW32 is one of the two supported hardware configurations for firmware 2.0 and may be named in docs and on GitHub; silent launch: no Discord announcement of the hardware until Robert says so (replaces the 2026-11-22 "prototype board" wording) | AGENT-CORE block (Discord line), `.claude/skills/beta-release-2x/SKILL.md`, TASK-3115 |
 
 ## Replaced directives
 
 | Date | Old directive | Replaced by | Date replaced |
 |---|---|---|---|
+| 2026-11-25 | Public betas at any full hour from 07:00 to 23:00, at most one per hour (hourly slots) | At most one public beta per 3 hours, 07:00 to 22:00 | 2026-11-27 |
 | 2026-10-22 | SAT ground truth ranking with the pinned thermo-nova code (7beaaf5) second, above our firmware | Our implementation plus the recorded decisions is leading; Alex Wijn's SAT is a reference (TASK-3013) | 2026-11-21 |
 | 2026-11-04 | 2.0.0 stable waits until SAT low-load is field-validated (epic TASK-1412 closed, TASK-1412.16-26) | 2.0.0 stable gate = TASK-1740; the epic and its full gate go to 2.1.0, 2.0.0 keeps the reduced slice (Robert, DM 1571910380756668488, option A of the TASK-1412 proposal) | 2026-11-16 |
 | before 2026-10-25 | Repeat an unanswered SAT question to Sergeant D every 12 hours | Pace questions to his presence: check hourly, re-ask as soon as he is back | 2026-10-25 |

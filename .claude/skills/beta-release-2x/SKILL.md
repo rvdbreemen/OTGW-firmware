@@ -37,16 +37,20 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
 
 - **Never use em dashes.** Colons, periods, commas, parentheses.
 - **All release text in English.** No emojis.
-- **OTGW32 may be named publicly** (Robert, 2026-11-22): call it a prototype board. The
-  main public hardware is still the OTGW Classic with an S3 Mini.
+- **The OpenTherm Gateway OTGW32 may be named in docs and on GitHub** (Robert, 2026-11-27): it is one
+  of the two supported hardware configurations for firmware 2.0 (the OTGW Classic with an ESP32-S3
+  module, and the OTGW32). No Discord announcement of the hardware launch until Robert says so
+  (silent launch, 27 Nov 2026).
 
 ## Process
 
 ### Phase 0: Preconditions and coordination
 
-1. **CHECKPOINT 1: hourly slots** (Robert 2026-11-25 22:50; replaces the four-slot rule of 22:20 and the 12-hour 08:00/20:00 rule of
-   2026-11-02): a public beta may go out at any full hour from 07:00 to 23:00, at most one beta per hour, and only with a candidate that
-   finished its 60 min soak; an hour without a soaked candidate is skipped. Every firmware task keeps its own
+1. **CHECKPOINT 1: one public beta per 3 hours, published 07:00 to 22:00** (Robert 2026-11-27: "Je mag publieke beta's
+   uitbrengen elke 3 uur gedurende de dag. Dat is tussen 7 en 22 uur."; replaces the hourly slots of 2026-11-25 22:50, the four-slot rule
+   of 22:20 and the 12-hour 08:00/20:00 rule of 2026-11-02): a public beta may be published at any time from 07:00 to 22:00, at most one
+   public beta per 3 hours, and only with a candidate that finished its 60 min soak; a window without a soaked candidate is skipped.
+   T is the publish time. Every firmware task keeps its own
    `2.0.0-beta.N` bump and its #alpha-testing zip (alpha track); only the daily release gets a
    GitHub prerelease and a #beta-testing post. Candidate: origin/dev HEAD at compose time (T-75, see
    below), published as the release build that ran at least 1 h on the bench unit (.63) with MQTT
@@ -79,7 +83,7 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    **Compose shortly before, publish at the slot** (Robert 2026-11-15: "de release kort van
    tevoren samenstelt. Zodat elke user de nieuwst mogelijke release krijgt. Geen vertraging na de
    soak van een 1 uur."). The soak runs on the RELEASE BUILD itself, so the soak end is the
-   publish moment. Timeline for slot T (any full hour 07:00-23:00). When the candidate is not built yet, follow the steps below. When the candidate was
+   publish moment. Timeline for publish time T (07:00 to 22:00, at least 3 hours after the previous public beta). When the candidate is not built yet, follow the steps below. When the candidate was
    built and soaked earlier, with its release docs already inside the commit, publish at the first slot after its 60 min soak passed (tag, draft,
    verify, publish, posts; no rebuild):
    - all day: the notes draft and the Discord post draft are kept current after every push
@@ -129,6 +133,15 @@ from the file at create time.
    beta, Before you flash (save settings, USB first flash for a new S3 Mini,
    `/update` with the zip for units on 2.0.0, port 25238 opt-in), BREAKING changes,
    Known issues, How to report.
+   **Structure and language** (TASK-2969 R4; Robert 2026-11-27: always write which builds are in the beta
+   and which functions were added, completely, in plain language without programming terms): a short plain head
+   first (about 15 lines: what this beta is, who it is for, how to update, what is not tested), then
+   "Which builds are in this beta" (builds since the previous public beta, and which build was tested overnight), then
+   "What is new, in plain words": EVERY user-visible addition, change and fix since the previous public beta, each in 1 to 3 sentences
+   a house owner understands (what you notice, when it matters), TASK numbers only as a trailing "(ref: TASK-NNN)", no function, file,
+   ADR or protocol names. Internal-only items go in ONE plain line with a count. Honest "not verified" lines in plain words. The per-range
+   test provenance of older betas goes into an appendix at the end of the file. Cross-check: every TASK id in
+   `git log <previous tag>..origin/dev` appears in the plain list or the internal line.
 2. Every claim checked against code (`file:line`) or an ADR. No TODOs, no
    placeholders, no em dashes:
    ```bash
@@ -302,7 +315,7 @@ from the file at create time.
    ```
    Add the row to `.claude/alpha-build-ledger.local.md` (for a note: "zip already
    posted as alpha beta.N" and both message ids).
-2. **#beta-testing announcement** (sent without showing it first under the hourly-slot rule
+2. **#beta-testing announcement** (sent without showing it first under the 3-hour rule
    above; show it first only when it announces something new to weigh). One post per release; when two betas go out within 3 h, they may be
    combined in one message, newest release link first.
    Channel `914498730001072149`, via `mcp__discord-mcp__send_message` (the webhook
