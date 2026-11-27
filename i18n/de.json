@@ -356,7 +356,8 @@
     "leg_setpoint": "Sollwert",
     "leg_modulation": "Modulation",
     "strip_aria": "Live-Verlauf von Vorlauf, Rücklauf, Sollwert und Modulation",
-    "ticker_aria": "Live-OpenTherm-Nachrichten"
+    "ticker_aria": "Live-OpenTherm-Nachrichten",
+    "nav_advanced_sub_otd": "Debug · Dateien · System"
   },
   "h_mon": {
     "cmd_aria": "OTGW-Befehl",
@@ -914,7 +915,7 @@
         "title": "Zeit / NTP"
       },
       "otd": {
-        "desc": "Direkte OpenTherm-Steuerung (Hardware ohne PIC).",
+        "desc": "Direkte OpenTherm-Steuerung (Hardware ohne PIC). Auf dieser Platine nicht verfügbar: PIC-Firmware-Updates und Bluetooth-Sensoren.",
         "title": "OT-Direct"
       },
       "otgw": {
@@ -1043,7 +1044,7 @@
       "gpiosensorspin": "GPIO-Pin",
       "hostname": "Hostname",
       "httppasswd": "Admin-Passwort",
-      "ledblink": "LED blinkt bei OT-Verkehr",
+      "ledblink": "Status-LED blinken lassen",
       "updatecheck": "GitHub nach neuen Versionen fragen",
       "updatecheckbeta": "Auch Betaversionen melden",
       "legacyport25238enabled": "Alter TCP-Port 25238",
@@ -1066,7 +1067,7 @@
       "ntphostname": "NTP-Server",
       "ntpsendtime": "Uhrzeit an Thermostat senden",
       "ntptimezone": "Zeitzone",
-      "otdautobypass": "Automatischer Bypass",
+      "otdautobypass": "Lüftungs-Bypass: automatisch",
       "otdautodetect": "OT-Direct-Modus automatisch erkennen",
       "otdenableslave": "Thermostat-Durchleitung aktivieren (Slave-Seite)",
       "otdfailsafe": "Notbetrieb bei Ausfall des OT-Busses",
@@ -1074,7 +1075,7 @@
       "otdhasbypassrelay": "Bypass-Relais vorhanden",
       "otdmode": "OT-Direct-Modus",
       "otdmsginterval": "Nachrichtenintervall",
-      "otdopenbypass": "Bypass jetzt öffnen",
+      "otdopenbypass": "Lüftungs-Bypass jetzt öffnen",
       "otdsetbacktemp": "Absenktemperatur",
       "otdsummermode": "Sommerbetrieb (Heizung aus)",
       "otdventenable": "Lüftung aktiviert",
@@ -1231,7 +1232,8 @@
     "wh_send_test": "{{state}}-Test senden",
     "wh_send_title": "Löst den gespeicherten {{state}}-Webhook aus (POST /api/v2/webhook/test)",
     "wh_sending": "{{state}} wird gesendet…",
-    "wh_sent": "✓ {{state}} {{ack}} · {{time}}"
+    "wh_sent": "✓ {{state}} {{ack}} · {{time}}",
+    "pin_not_set": "nicht gesetzt"
   },
   "stats": {
     "concl": {

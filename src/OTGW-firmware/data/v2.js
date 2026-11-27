@@ -438,6 +438,7 @@
       "nav_monitor_sub": "log · stats · support · graph · connection",
       "nav_settings_sub": "grouped & scannable",
       "nav_advanced_sub": "pic · debug · files · system",
+      "nav_advanced_sub_otd": "debug · files · system",
       "nav_diagnose": "Diagnose",
       "nav_diagnose_sub": "PIC test menu",
       "viewpick_title": "Choose home view",
@@ -1035,7 +1036,7 @@
           "title": "Time / NTP"
         },
         "otd": {
-          "desc": "Direct OpenTherm control (hardware without a PIC).",
+          "desc": "Direct OpenTherm control (hardware without a PIC). Not available on this board: PIC firmware updates and Bluetooth sensors.",
           "title": "OT-Direct"
         },
         "otgw": {
@@ -1107,6 +1108,7 @@
       "help_aria": "Help: {{label}}",
       "help_loading": "Loading…",
       "help_none": "No help text for this setting.",
+      "pin_not_set": "not set",
       "help_unavailable": "Help not available.",
       "help": {
         "satboilerratedkw": "kW gas input. Enables the gas estimate and caps it (0 = off)",
@@ -1164,7 +1166,7 @@
         "gpiosensorspin": "GPIO pin",
         "hostname": "Hostname",
         "httppasswd": "Admin password",
-        "ledblink": "Blink LED on OT traffic",
+        "ledblink": "Blink status LED",
         "updatecheck": "Check GitHub for new versions",
         "updatecheckbeta": "Also tell about beta versions",
         "legacyport25238enabled": "Legacy TCP port 25238",
@@ -1187,7 +1189,7 @@
         "ntphostname": "NTP server",
         "ntpsendtime": "Send time to thermostat",
         "ntptimezone": "Timezone",
-        "otdautobypass": "Auto bypass",
+        "otdautobypass": "Ventilation bypass: automatic",
         "otdautodetect": "Auto-detect OT-Direct mode",
         "otdenableslave": "Enable slave (thermostat) passthrough",
         "otdfailsafe": "Fail-safe on OT bus loss",
@@ -1195,7 +1197,7 @@
         "otdhasbypassrelay": "Bypass relay fitted",
         "otdmode": "OT-Direct mode",
         "otdmsginterval": "Message interval",
-        "otdopenbypass": "Open bypass now",
+        "otdopenbypass": "Open ventilation bypass now",
         "otdsetbacktemp": "Setback temperature",
         "otdsummermode": "Summer mode (CH off)",
         "otdventenable": "Ventilation enabled",
@@ -2171,13 +2173,29 @@
   // ---------- Advanced sub-tabs (TASK-982): PIC / Debug / File System / System ----------
   // TASK-1843: without a PIC (OT-Direct) the PIC firmware tab has nothing to offer: hide it, and leave
   // it for Debug Information when it was the open tab. Only a known answer decides (fetchPic/initPicTabGate).
-  function applyPicTabGate(isPic) {
+  // The board's command interface once the device has answered: true = PIC, false = OT-Direct (or another non-PIC), null = not known yet.
+  // Only a known answer hides anything (an unknown one leaves the UI as it was).
+  var boardIsPic = null;
+  // device/info has_output_pin === false: the board has no pad for the GPIO output (TASK-3120), so its group is hidden; absent or true = shown.
+  var boardNoOutputPin = false;
+  function boardHidesKey(k) {
+    if (k === 'pictempsensor' && boardIsPic === false) return true;   // PIC Classic only (settingsHelp.h)
+    // The boot commands are PIC commands: sendPICBootCommands() returns at once without a PIC (OTGW-Core.ino:1559-1561), so on OT-Direct both rows do nothing.
+    if ((k === 'otgwcommandenable' || k === 'otgwcommands') && boardIsPic === false) return true;
+    return boardNoOutputPin && SET_META[k] && SET_META[k].cat === 'outputs';
+  }
+  function applyPicTabGate(isPic, noOutputPin) {
+    var changed = boardIsPic !== isPic; boardIsPic = isPic;
+    if (noOutputPin !== undefined && boardNoOutputPin !== noOutputPin) { boardNoOutputPin = noOutputPin; changed = true; }
+    var sub = document.querySelector('#nav [data-page="advanced"] small, .seg[data-page="advanced"] small');   // no PIC tab, so no 'pic' in the nav subtitle
+    if (sub) { var sk = isPic ? 'h_home.nav_advanced_sub' : 'h_home.nav_advanced_sub_otd'; sub.setAttribute('data-i18n', sk); sub.textContent = t(sk); }
+    if (changed && document.getElementById('setRail') && setData && Object.keys(setData).length) renderSettings();   // the settings rows depend on the board
     var tab = document.querySelector('#advTabs .subtab[data-adv="pic"]'); if (!tab) return;
     tab.hidden = !isPic;
     if (!isPic && tab.classList.contains('active')) showAdvTab('debug');
   }
   function initPicTabGate() {
-    withDeviceInfo(function (d) { if (d && d.otcommandinterface !== undefined) applyPicTabGate((d.otcommandinterface || '') === 'PIC'); });
+    withDeviceInfo(function (d) { if (d && d.otcommandinterface !== undefined) applyPicTabGate((d.otcommandinterface || '') === 'PIC', d.has_output_pin === false); });
   }
   function showAdvTab(k) {
     document.querySelectorAll('#advTabs .subtab').forEach(function (s) {
@@ -4348,7 +4366,7 @@
     { id: 'mqtt',     title: 'MQTT',                   icon: '📨', reboot: false, desc: 'Broker connection and Home Assistant publishing.' },
     { id: 'ntp',      title: 'Time / NTP',             icon: '🕐', reboot: false, desc: 'Clock synchronisation.' },
     { id: 'otgw',     title: 'OpenTherm Gateway',      icon: '🔥', reboot: false, desc: 'Commands sent to the PIC at boot.' },
-    { id: 'otd',      title: 'OT-Direct',              icon: '🎚', reboot: false, desc: 'Direct OpenTherm control (hardware without a PIC).' },
+    { id: 'otd',      title: 'OT-Direct',              icon: '🎚', reboot: false, desc: 'Direct OpenTherm control (hardware without a PIC). Not available on this board: PIC firmware updates and Bluetooth sensors.' },
     { id: 'sensors',  title: 'Sensors',                icon: '🌡', reboot: false, desc: '1-Wire / GPIO temperature sensors and the BLE roster.' },
     { id: 'outputs',  title: 'GPIO Outputs',           icon: '🔌', reboot: false, desc: 'Drive a GPIO from OT state.' },
     { id: 's0',       title: 'S0 Pulse Counter',       icon: '⚡', reboot: false, desc: 'Energy pulse counting.' },
@@ -4415,7 +4433,7 @@
     webhookurloff:   { cat: 'webhook', label: 'URL when OFF' },
     webhookcontenttype: { cat: 'webhook', label: 'Content type' },
     webhookpayload:  { cat: 'webhook', label: 'Payload template' },
-    ledblink:        { cat: 'behavior', label: 'Blink LED on OT traffic' },
+    ledblink:        { cat: 'behavior', label: 'Blink status LED' },
     nightlyrestart:  { cat: 'behavior', label: 'Nightly restart' },
     nightlyrestarthour: { cat: 'behavior', label: 'Restart hour', hint: '0–23' },
     updatecheck:     { cat: 'behavior', label: 'Check GitHub for new versions' },   // TASK-2023
@@ -4435,8 +4453,8 @@
     otdmode:         { cat: 'otd', label: 'OT-Direct mode' },
     // OT-Direct ventilation (TASK-933 Phase 2)
     otdventenable:       { cat: 'otd', label: 'Ventilation enabled' },
-    otdopenbypass:       { cat: 'otd', label: 'Open bypass now' },
-    otdautobypass:       { cat: 'otd', label: 'Auto bypass' },
+    otdopenbypass:       { cat: 'otd', label: 'Open ventilation bypass now' },
+    otdautobypass:       { cat: 'otd', label: 'Ventilation bypass: automatic' },
     otdfreeventenable:   { cat: 'otd', label: 'Free ventilation' },
     otdventsetpoint:     { cat: 'otd', label: 'Ventilation setpoint', hint: '%' },
     otdhasbypassrelay:   { cat: 'otd', label: 'Bypass relay fitted' },
@@ -4614,7 +4632,9 @@
   // browser, else the OS preference, see the v2.html pre-paint script); the key stays in REST
   // and in the settings file.
   // TASK-2023: updatecheckasked is the one-time question's flag, set by the UI itself.
-  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1, darktheme: 1, updatecheckasked: 1 };
+  // TASK-3121: the three bypass settings are stored and shown only, nothing reads them in this release (settingStuff.ino:500-501, restAPI.ino:629-630,
+  // the relay readers sit inside '#if HAS_BYPASS_RELAY'; docs ch11.2: bypass is not supported), so no row promises a function. Labels and help stay in the dictionaries.
+  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1, darktheme: 1, updatecheckasked: 1, otdopenbypass: 1, otdautobypass: 1, otdhasbypassrelay: 1 };
   function humanizeKey(k) {
     var s = k.replace(/^(sat|otd|gpiosensors|gpiooutputs|s0counter|mqtt|wifi|eth|ntp|webhook|ui_|dallas)/, '');
     if (!s) s = k;
@@ -4845,10 +4865,14 @@
   // Password fields: GET returns a masked sentinel ("password=N"), never the real
   // secret. Show an empty field; only POST when the user actually typed something.
   function isPwd(k) { return setData[k] && setData[k].type === 'p'; }
+  // TASK-3120: a pin that can be "not set" travels as the integer -1 (firmware: s0counterpin, range -1..48). The field shows it EMPTY with a hint,
+  // and a cleared field is saved as -1.
+  var NOTSET_PIN_KEYS = { s0counterpin: 1 };
+  function pinShown(k, v) { return (NOTSET_PIN_KEYS[k] && ('' + v) === '-1') ? '' : '' + v; }
   function curVal(k) {
-    if (fieldDirty(k)) return setDirty[k];
+    if (fieldDirty(k)) return pinShown(k, setDirty[k]);
     if (isPwd(k)) return '';
-    return '' + setData[k].value;
+    return pinShown(k, setData[k].value);
   }
   // keys per category, honoring the search filter
   function keysForCat(id, q) {
@@ -4906,7 +4930,7 @@
     // per-category counts and a REBOOT badge on reboot-sensitive categories.
     var firstNonEmpty = '';
     function catKeys(id) {   // TASK-1012: never render internal onboarding flags
-      return keysForCat(id, q).filter(function (k) { return !SET_HIDE_ROW[k]; });
+      return keysForCat(id, q).filter(function (k) { return !SET_HIDE_ROW[k] && !boardHidesKey(k); });
     }
     function catShown(id) { return id === 'sat' ? keysForCat(id, q).length : catKeys(id).length; }
     SET_CATS.forEach(function (c) {
@@ -5110,6 +5134,7 @@
       input.type = (type === 'p') ? 'password' : (type === 'i') ? 'number' : 'text';
       input.value = curVal(k);
       if (type === 'p') input.placeholder = '••••••••';
+      if (NOTSET_PIN_KEYS[k]) input.placeholder = t('settings.pin_not_set');   // TASK-3120
       if (meta.maxlen > 0) input.maxLength = meta.maxlen;
       var isIp = IP_KEY_RE.test(k), wasEmpty = input.value.trim() === '';
       input.addEventListener('input', function () {
@@ -5238,6 +5263,7 @@
     }
     // Password fields show empty; an empty value means "leave unchanged", so it is
     // never dirty and never POSTed (the GET-side value is a mask, not the secret).
+    if (NOTSET_PIN_KEYS[k] && ('' + val).trim() === '') val = '-1';   // TASK-3120: cleared = not set
     var same = ('' + setData[k].value) === val && !(k === 'otdmode' && otdRunningDiffers(val));   // TASK-1702
     if ((isPwd(k) && val === '') || same) delete setDirty[k];
     else setDirty[k] = val;
@@ -9341,7 +9367,7 @@
     // chips and the PIC-tab visibility (withDeviceInfo dedups + caches 8s).
     // TASK-1223.16: the same snapshot seeds the OT-Direct mode chip (otdmode) before the
     // first otdirect/status read.
-    setTimeout(function () { applyPicTabVisibility(); withDeviceInfo(function (d) { if (d) { fillHeaderIdentity(d); if (d.otdmode) setOtdMode(d.otdmode); } }); }, 1200);
+    setTimeout(function () { applyPicTabVisibility(); initPicTabGate(); withDeviceInfo(function (d) { if (d) { fillHeaderIdentity(d); if (d.otdmode) setOtdMode(d.otdmode); } }); }, 1200);
     // TASK-991: on a bench setup (no boiler/thermostat on the bus, PIC board), offer
     // simulation mode once. Delayed past the boot burst so the bus state has settled.
     setTimeout(maybePromptSimulation, 12000);

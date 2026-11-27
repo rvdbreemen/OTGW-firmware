@@ -258,6 +258,7 @@ function load(fetchImpl) {
     SET_META_SRC,
     stateDecls.join('\n'),
     'var setData = {}, setDirty = {}, ENUM_OPTS = {}, IP_KEY_RE = /^$/;',
+    'var NOTSET_PIN_KEYS = {};',   // TASK-3120: settingRow reads it (the real map is in v2.js)
     'function curVal(k) { return setData[k].value; }',
     'function fieldDirty() { return false; }',
     'function markDirty() {}',
