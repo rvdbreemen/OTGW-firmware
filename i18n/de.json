@@ -1041,7 +1041,7 @@
       "gpiosensorspin": "GPIO-Pin",
       "hostname": "Hostname",
       "httppasswd": "Admin-Passwort",
-      "ledblink": "LED blinkt bei OT-Verkehr",
+      "ledblink": "Status-LED blinken lassen",
       "updatecheck": "GitHub nach neuen Versionen fragen",
       "updatecheckbeta": "Auch Betaversionen melden",
       "legacyport25238enabled": "Alter TCP-Port 25238",

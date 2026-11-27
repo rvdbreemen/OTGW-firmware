@@ -1041,7 +1041,7 @@
       "gpiosensorspin": "Ακροδέκτης GPIO",
       "hostname": "Όνομα συσκευής",
       "httppasswd": "Κωδικός διαχειριστή",
-      "ledblink": "Αναβόσβημα LED με κίνηση OT",
+      "ledblink": "Αναβόσβημα LED κατάστασης",
       "updatecheck": "Έλεγχος GitHub για νέες εκδόσεις",
       "updatecheckbeta": "Ειδοποίηση και για εκδόσεις beta",
       "legacyport25238enabled": "Παλιά θύρα TCP 25238",

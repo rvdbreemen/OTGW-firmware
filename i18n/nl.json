@@ -1041,7 +1041,7 @@
       "gpiosensorspin": "GPIO-pin",
       "hostname": "Hostnaam",
       "httppasswd": "Beheerderswachtwoord",
-      "ledblink": "LED knippert bij OT-verkeer",
+      "ledblink": "Statusled laten knipperen",
       "updatecheck": "GitHub controleren op nieuwe versies",
       "updatecheckbeta": "Ook bètaversies melden",
       "legacyport25238enabled": "Oude TCP-poort 25238",

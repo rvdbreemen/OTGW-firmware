@@ -1162,7 +1162,7 @@
         "gpiosensorspin": "GPIO pin",
         "hostname": "Hostname",
         "httppasswd": "Admin password",
-        "ledblink": "Blink LED on OT traffic",
+        "ledblink": "Blink status LED",
         "updatecheck": "Check GitHub for new versions",
         "updatecheckbeta": "Also tell about beta versions",
         "legacyport25238enabled": "Legacy TCP port 25238",
@@ -4395,7 +4395,7 @@
     webhookurloff:   { cat: 'webhook', label: 'URL when OFF' },
     webhookcontenttype: { cat: 'webhook', label: 'Content type' },
     webhookpayload:  { cat: 'webhook', label: 'Payload template' },
-    ledblink:        { cat: 'behavior', label: 'Blink LED on OT traffic' },
+    ledblink:        { cat: 'behavior', label: 'Blink status LED' },
     nightlyrestart:  { cat: 'behavior', label: 'Nightly restart' },
     nightlyrestarthour: { cat: 'behavior', label: 'Restart hour', hint: '0–23' },
     updatecheck:     { cat: 'behavior', label: 'Check GitHub for new versions' },   // TASK-2023
