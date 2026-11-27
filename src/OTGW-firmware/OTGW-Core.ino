@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.463
+**  Version  : v2.0.0-beta.464
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4012,9 +4012,9 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
       otdCmdTextDrain();
       // TASK-1593: a command the OT-Direct handler refused (ring full, validation error, SAT-owned CS=) is Dropped, not Sent,
       // so SAT does not cache it as delivered.
-      if (!handleOTDirectCommand(buf, len, satOwn)) return CmdQueueResult::Dropped;
-      otOverrideNoteCommand(buf, len);   // TASK-3033
-      return CmdQueueResult::Sent;
+      const CmdQueueResult otdResult = handleOTDirectCommand(buf, len, satOwn) ? CmdQueueResult::Sent : CmdQueueResult::Dropped;
+      if (otdResult == CmdQueueResult::Sent) otOverrideNoteCommand(buf, len);   // TASK-3033: only an accepted command is noted
+      return otdResult;
     }
 #endif
     OTDebugTln(F("CmdQueue: No PIC or OT-direct detected - command ignored"));
