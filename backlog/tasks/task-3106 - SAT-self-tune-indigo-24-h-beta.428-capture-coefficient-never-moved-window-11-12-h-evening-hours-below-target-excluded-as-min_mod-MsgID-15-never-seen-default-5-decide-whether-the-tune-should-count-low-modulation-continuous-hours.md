@@ -5,10 +5,11 @@ title: >-
   11/12 h), evening hours below target excluded as min_mod (MsgID 15 never seen,
   default 5 %): decide whether the tune should count low-modulation continuous
   hours
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-26T13:36:00Z'
-updated_date: '2026-11-26T18:03:00Z'
+updated_date: '2026-11-27T07:11:00Z'
 labels:
   - sat
   - research
@@ -46,4 +47,8 @@ IMPORTANT for TASK-3106: the tune band of 1.0 C (SAT_CT_BAND_C, SATcurveTune.h@4
 Not shown: whether the offset is acceptable (a SAT behaviour question for Sergeant D, not decided here); whether capture A's tune would move the curve if the evening hours were weighted alone, or whether the house needs a higher curve in the evening only (a daily pattern a 12-hour window averages out); capture B's signal on beta.451 (not analysed); whether capture B's boiler could deliver more at flow 43 to 46. Capture B numbers come from the earlier facts file, not from a re-extraction.
 
 Side fact from the Q-428a draft (queued in the SAT decision register, not asked): in capture A the heating-failure check (15 min at the maximum, room rose less than 0.5 C) fired 4 times inside tolerance-band pauses; the self-tune excludes ticks while that event is set (SATcontrol.ino@428 about 8872 to 7006, SATT_DIAG_EVENT, third in order before no_sun, flame_off, min_mod), so hours 02, 11 and 12 of that run drop from this alone and hour 14 probably not (computed from event times, not from a counter). So the self-tune hours are excluded by something other than the heating itself in both captures (capture B: no_sun / min_mod; capture A: heating-failure ticks). Fact only, no conclusion.
+
+2026-11-27 PLAN AC2/AC4 replay (otgw-webui; Sergeant D Q4 = C, entry 502, release 2.1.0, our reading: replay first, build only if the curve moves the right way and not on noise). (1) Harness: compile the REAL pure tuner block (satCurveTune begin/end) + SATcurveTune.h from origin/dev with the stubs of tests/test_sat_curve_selftune.py; a driver reads a per-tick CSV and calls satTuneAddTick/CloseHour/CloseDay exactly as the glue does. (2) Per-tick input from the captures: sattick.csv (room, target, curve, praw -> signal = clamp(praw)-curve, ch, pwm, flame, dhw) + otframes (MsgID 17 relative modulation, MsgID 15 min modulation) ; sun elevation and diag events are not in sattick: taken from the recorded hourly reason in sattuneh.csv (a recorded sun/no_sun/diag_event hour stays excluded in both runs). (3) Baseline must first reproduce the capture's own sattuneh.csv hour by hour (counted/reason/mean); if it does not, the gap is reported and no claim is made. (4) Variant: the min_mod exclusion applies only when the room is NOT under target (error <= 0); one condition in satTuneTickReason, nothing else. (5) Captures: indigo beta.428 (25 h 41 min), marceld91d beta.428, will_85903 beta.428 (no_sun: expected no change), indigo beta.451 run when it arrives. (6) Output: per capture counted hours, window, decisions and coefficient trajectory baseline vs variant, a chart, and a yes/no with the main risk (oversized boiler: low modulation under target may raise the curve). No firmware change before the replay holds (entry 502).
+
+2026-11-27 REPLAY RESULT (otgw-webui; full report OTGW-field-data/_comms/selftune_replay/REPORT.md, chart indigo_beta428_replay.png, tool scripts/sat_selftune_replay.py in lane ba-tool, local). Baseline replay reproduces the captures' own hourly records (marcel 23/23, indigo 25/25 counted flags, will 25/25). Variant (min_mod only when the room is not under target): indigo beta.428 counts 14 instead of 4 hours, window fills at hour 16, window mean +3.06 C (warm-up +3.10, floating +2.85), raise 2.30 -> 2.35; marcel and will unchanged. Threshold sensitivity: error > 0 raises, error > 0.1 counts 9 hours and gives no decision in 25 h. Answer: yes, conditionally (right direction; one house, 25 h; threshold is a Sergeant D choice; beta.451 run not delivered, not analysed). Open-loop limit: only the first decision and the window means are meaningful. AC2 stays open until the beta.451 run is replayed; AC4 not started (no code before the replay holds).
 <!-- SECTION:NOTES:END -->
