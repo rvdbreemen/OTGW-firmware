@@ -52,11 +52,17 @@ status_history:
 
 Terms used below: SAT (Smart Autotune Thermostat, the thermostat logic in the firmware); PWM (pulse-width modulation, SAT's on/off burn cycle mode); continuous (SAT's modulating mode); request (the flow setpoint the PID (proportional-integral-derivative) controller asks for); flame-on edge (the moment the boiler reports the flame on).
 
-ADR-305 (Accepted 2026-11-28) makes the switching between continuous and PWM follow Alex Wijn's SAT at 7beaaf5 (March 2026). ADR-306 (Proposed) keeps the margin as the setting `satpwmswitchmargin`, default 3.0. Since then, Robert has given four orders. All are recorded in the register; the DM ids were read back by otgw-architect.
+ADR-305 (Accepted 2026-11-28) makes the switching between continuous and PWM follow Alex Wijn's SAT at 7beaaf5 (March 2026). ADR-306 (Proposed) keeps the margin as the setting `satpwmswitchmargin`, default 3.0. Since then, Robert has given five orders. The first four are recorded in the register; the DM ids were read back by otgw-architect.
 - **Entries 536 and 537:** compare with Alex's latest 5.x release. The snapshot `other-projects/SAT-develop/` is now tag 5.1.0, `9c2fad9`, 2026-11-25.
 - **Entry 540:** DM 1576235189657669763, "C". The benched build 313c4ba ships as the next beta, and 5.1.0 follows after it.
 - **Entry 541:** DM 1576247783747231919, "A". Point (c) is not adopted: the live-flow duty stays.
 - **Entry 542:** coordinator chat, 16:11 laptop time. This quote was relayed by the coordinator and not seen by otgw-architect: "Just update and align to 5.1.0. Only where you think we have a solution better in this firmware we use ours. Analysis 5.1.0 and our and you do what thinks best."
+- **Approval of the deviation list, 2026-11-28.**
+  - In his chat with the coordinator, Robert wrote: "Keep going your next beta should be on par with 5.1.0". This quote was relayed by the coordinator and not seen by otgw-architect.
+  - BlueFlame then sent him the list of what is adopted and what deliberately stays ours (DM 1576317899331608577, 19:24:33 UTC).
+  - Robert answered "Akkoord" (DM 1576318201535402077, 19:25:45 UTC). Both DMs were read back by otgw-architect.
+  - The list: adopt (h), (a), (d1), (k) and the 0.0 part of (i). Keep ours for (c) and (e) (entry 541), (d2) (the replay), (b) and (f) (revisited with captures), and the 5 min wait of (i) (entry 263).
+  - Register entry: not yet assigned.
 
 The differences between 7beaaf5 and 5.1.0 are listed in `docs/sat/alex-sat-5.1.0-delta.md` section 1. otgw-architect and otgw-poc-dev analysed them in `OTGW-field-data/_comms/sat_5_1_0_decision_table_2026-11-28.md`. The rule was: adopt 5.1.0 unless there is evidence that ours is better. The coordinator decided the open rows at 16:40.
 
@@ -67,6 +73,8 @@ All 5.1.0 citations are `custom_components/sat/<file>:<line>` at `9c2fad9`, open
 ## Decision
 
 SAT takes over five 5.1.0 rules for PWM and mode switching, and keeps its own rule on the other points. One more point (the overshoot reference) was checked by a replay and stays ours.
+
+Robert approved this split for the next beta ("Akkoord", DM 1576318201535402077, to the list in DM 1576317899331608577). That approval covers the content of the next beta. It is not the formal acceptance of this ADR: the ADR stays Proposed until Robert accepts it.
 
 **Adopted (step 1, in this order):**
 
