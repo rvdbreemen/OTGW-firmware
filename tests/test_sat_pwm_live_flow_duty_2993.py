@@ -76,14 +76,21 @@ def build(src_text, d, name):
     path = d / f"{name}_SATcontrol.ino"
     path.write_text(src_text, encoding="utf-8")
     old = hp.SAT_INO
+    stubs = hp.base.STUBS
     try:
         hp.SAT_INO = path
         hp.MAIN = MAIN
+        # The shared STUBS carry the cold-cutoff state of the CURRENT SATcontrol.ino (extract_cold_cut()). The old side (BASE_REV) still has
+        # the TASK-1652 deferral flag _sat_coldCutDeferred, which the current source no longer has (TASK-3151.4): give each side its own.
+        cur = hp.base.extract_cold_cut(old.read_text(encoding="utf-8"))
+        assert cur in stubs, "the shared stubs no longer carry the cold-cutoff block of the current source"
+        hp.base.STUBS = stubs.replace(cur, hp.base.extract_cold_cut(src_text))
         sub = d / name
         sub.mkdir()
         return hp.build(sub)
     finally:
         hp.SAT_INO = old
+        hp.base.STUBS = stubs
 
 
 def run(exe, ticks):
