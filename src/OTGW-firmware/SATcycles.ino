@@ -1022,7 +1022,6 @@ static void satCycleApplyEndOfCycle(SATCycleClass cls, bool pwmEnabled)
     satNarrate_P(PSTR("Control mode: PWM (the last cycle overshot)"));
   } else if (pwmEnabled && state.sat.eControlMode == SAT_MODE_PWM) {
     if (cls != SAT_CYCLE_UNDERHEAT_PWM) return;
-    if (satStartGateActive()) return;   // entries 385/387: the start sequence of a heating start is not judged
     SATDebugTln(F("SAT: PWM cycle classified underheat, switching to continuous mode"));
     satSetControlMode(SAT_MODE_CONTINUOUS);
     satNarrate_P(PSTR("Control mode: continuous (the last PWM cycle stayed under the setpoint, PWM ended)"));
@@ -1429,8 +1428,7 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 // ADR-305: entry 456's 180 s flame gate is gone, as in thermo-nova 7beaaf5).
 // Saturation counts while the last PWM off time is 0, 300 s from the first such tick
 // (:359-362), and is only looked at when underheat did not fire (:217-220, :325-329).
-// Entries 385/387: neither exit fires inside the start sequence of a heating start (satStartGateActive(): the PWM entry of the start until 60 s
-// after its first CH flame-on); the timers keep counting, so a condition that lasted through the sequence fires on the first tick after it.
+// TASK-3151.2 (ADR-305): no start gate; a heating start runs in continuous and both exits count from the first valid tick.
 bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
 {
   if (state.sat.eControlMode != SAT_MODE_PWM || satDhwGuardActive(tickMs) || !state.sat.bPwmFlameRequested) {
@@ -1447,7 +1445,7 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
   } else if (flowTemp <= requestedSetpoint - SAT_UNDERSHOOT_MARGIN_C) {
     // Entry 492: on a cold start the saturation exit below fires first (about 300 s); this exit is reached when the flame
     // already burns with an off time above 0 and the request then steps up (mid-burn).
-    if (satSustainedFor(_sustain_underheatRunning, _sustain_underheatStartMs, tickMs, SAT_UNDERHEAT_SUSTAIN_MS) && !satStartGateActive()) {
+    if (satSustainedFor(_sustain_underheatRunning, _sustain_underheatStartMs, tickMs, SAT_UNDERHEAT_SUSTAIN_MS)) {
       SATDebugTf(PSTR("SAT: sustained underheat (flow %.1f <= request %.1f - %.1f for %lus), switching to continuous mode\r\n"),
                  flowTemp, requestedSetpoint, SAT_UNDERSHOOT_MARGIN_C, (unsigned long)(SAT_UNDERHEAT_SUSTAIN_MS / 1000UL));
       satSetControlMode(SAT_MODE_CONTINUOUS);
@@ -1464,7 +1462,7 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
   // limit from the first ON tick, so this exit ends PWM at about 300 s after ignition, ahead of the underheat exit above
   // (flame gate 180 s plus sustain 180 s = 360 s). Same end state: continuous, the flame stays continuous (entry 429).
   if (satPwmLastOffTimeMs() == 0) {
-    if (satSustainedFor(_sustain_saturationRunning, _sustain_saturationStartMs, tickMs, SAT_SATURATION_SUSTAIN_MS) && !satStartGateActive()) {
+    if (satSustainedFor(_sustain_saturationRunning, _sustain_saturationStartMs, tickMs, SAT_SATURATION_SUSTAIN_MS)) {
       SATDebugTln(F("SAT: PWM saturation (off_time=0 sustained), switching to continuous mode"));
       satSetControlMode(SAT_MODE_CONTINUOUS);
       satNarrate_P(PSTR("Control mode: continuous (PWM had no off time left)"));   // TASK-1521
