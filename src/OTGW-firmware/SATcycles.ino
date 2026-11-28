@@ -28,10 +28,11 @@
 // --- Cycle Constants ---
 static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;
 static const uint32_t SAT_CYCLE_MIN_SAMPLES        = 3;       // a cycle with fewer 1 Hz samples is not recorded (tracker.py:98-100, minimum_samples_per_cycle, TASK-1588)
-// The cycle classifier's overshoot margin is settings.sat.fOvershootMargin (default 2.0C; Python OVERSHOOT_MARGIN_CELSIUS is 3.0)
+// The cycle classifier's OVERSHOOT verdict uses settings.sat.fPwmSwitchMargin (default 3.0C = Python OVERSHOOT_MARGIN_CELSIUS, ADR-306);
+// settings.sat.fOvershootMargin (default 2.0C) only counts the overshoot seconds of the cycle statistics
 static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot (cycle classifier streak)
 // TASK-2005, Sergeant D entry 407 (supersedes entry 327's 1.5 C / 30 s; thermo-nova 3.0 C / 60 s, cycles/const.py:10,
-// const.py:21): continuous -> PWM when flow - requested >= settings.sat.fPwmSwitchMargin (default 2.0, Q-407a) for 60 s.
+// const.py:21): continuous -> PWM when flow - requested >= settings.sat.fPwmSwitchMargin (default 3.0 since TASK-3151.3, ADR-306) for 60 s.
 static const uint32_t SAT_OVERSHOOT_SUSTAIN_MS      = 60000UL;  // Sustained overshoot before PWM switch (satCycleCheckOvershootSwitch)
 static const float    SAT_UNDERSHOOT_MARGIN_C       = 3.0f;    // Below-setpoint margin for underheat (Python UNDERSHOOT_MARGIN_CELSIUS=-3.0, cycles/const.py:11)
 // TASK-3008 (Sergeant D entry 448, replaces entry 342): the PWM -> continuous underheat exit is thermo-nova's own: the flow at least
@@ -871,8 +872,8 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
 // that file's line. Firmware deviations, each decided or planned:
 //   - cold setpoint satGetColdSetpoint() (28.2 radiators / 21 underfloor, entries 7 and 11), not
 //     COLD_SETPOINT 22;
-//   - overshoot margin settings.sat.fOvershootMargin (2.0, `>=`, entries 15 and 37), not
-//     OVERSHOOT_MARGIN_CELSIUS 3.0 (cycles/const.py:10);
+//   - overshoot margin settings.sat.fPwmSwitchMargin (default 3.0 = OVERSHOOT_MARGIN_CELSIUS, cycles/const.py:10, `>=`;
+//     ADR-306 replaces the separate 2.0 of entries 15 and 37 for the verdict);
 //   - PWM underheat is labelled SAT_CYCLE_UNDERHEAT_PWM, continuous underheat SAT_CYCLE_UNDERHEAT;
 //   - a missing percentile (thermo-nova: p50/p90 None): the requested-setpoint metrics are missing when no
 //     tail second has a requested setpoint (value <= 0, cls:42-43); the control-setpoint error is missing
@@ -939,7 +940,7 @@ static SATCycleClass _cycleClassify(float durationSec, SATCycleKind kind,
   // cls:71-72: flow_control_setpoint_error p50/p90 missing
   if (!ctrlErrKnown) return SAT_CYCLE_UNCERTAIN;
   // cls:74, 77-78: overshoot is tested first
-  if (ctrlErrP90 >= settings.sat.fOvershootMargin) return SAT_CYCLE_OVERSHOOT;
+  if (ctrlErrP90 >= settings.sat.fPwmSwitchMargin) return SAT_CYCLE_OVERSHOOT;
   // cls:75, 80-88
   if (ctrlErrP50 <= -SAT_UNDERSHOOT_MARGIN_C) {
     // cls:81-83: tail p50 of the requested setpoint, else the device setpoint (the control setpoint at flame-on)
@@ -1376,7 +1377,7 @@ bool satCycleCheckLowLoadVeto()
 // The test uses the requested (PID) setpoint, not the final one: the continuous clamp keeps the final setpoint
 // within a few degrees of the flow, so comparing against it would almost never see an overshoot.
 // flow >= requested + margin counts, equality included (Q43 A; thermo-nova resets only on flow < threshold,
-// :288-291). The margin is settings.sat.fPwmSwitchMargin (default 2.0, entry 407 and Q-407a; thermo-nova's own is 3.0) and the
+// :288-291). The margin is settings.sat.fPwmSwitchMargin (default 3.0 as thermo-nova, ADR-306; entry 407 had 2.0) and the
 // time 60 s (entry 407, as thermo-nova). The 60 s are tickMs - start (Q46 B), so the switch comes on the first tick at
 // least 60 s after the first qualifying tick (ticks are never closer than one interval; entry 109). A tick outside CONTINUOUS (:264-266), or within the hot-water guard (:268-274),
 // clears the start.
