@@ -32,6 +32,7 @@ must fail on it and pass on the real source.
 
 Run: python tests/test_sat_loop_integration.py
 """
+import os
 import re
 import subprocess
 import sys
@@ -53,7 +54,11 @@ def driver_with_burn():
     d = B.rd(HERE / "sat_loop_driver.inc")
     old = "    else return 2;"
     assert d.count(old) == 1
-    return d.replace(old, '    else if (!strcmp(cmd, "burn")) { bo.flame = true; bo.ch = true; bo.cs = 60.0f; bo.flameChangeMs = g_ms; statusFrame(); }\n' + old)
+    d = d.replace(old, '    else if (!strcmp(cmd, "burn")) { bo.flame = true; bo.ch = true; bo.cs = 60.0f; bo.flameChangeMs = g_ms; statusFrame(); }\n' + old)
+    # TASK-3151.2: LittleFS is not mounted here, so the saved PWM flag (/sat_pwm_state.json) cannot be written. The environment variable
+    # SAT_PWMFLAG=1 stands in for "PWM was enabled before the restart": it sets the flag cache that satLoadPwmEnabled() reads, before initSAT().
+    assert d.count("  initSAT();\n") == 1
+    return d.replace("  initSAT();\n", '  if (getenv("SAT_PWMFLAG")) _sat_pwmSavedFlag = 1;   // see the restore scenario\n  initSAT();\n')
 
 
 def build(name="base", overrides=None):
@@ -80,8 +85,9 @@ def mutant(file, old, new):
 
 
 class Run:
-    def __init__(self, exe, script):
-        out = subprocess.run([str(exe)], input="\n".join(script) + "\n", capture_output=True, text=True, check=True).stdout
+    def __init__(self, exe, script, env=None):
+        out = subprocess.run([str(exe)], input="\n".join(script) + "\n", capture_output=True, text=True, check=True,
+                             env=dict(os.environ, **env) if env else None).stdout
         self.ev = []
         for l in out.splitlines():
             m = re.match(r"EV (\d+) (\w+) ?(.*)", l)
@@ -377,6 +383,58 @@ class SatLoopIntegration(unittest.TestCase):
 
     def test_s5_ot_link_lost_one_handback(self):
         check_s5(self, Run(self.exe, S5))
+
+
+class RestoreSavedPwmFlag(unittest.TestCase):
+    """TASK-3151.2, ADR-305 rule 7 (entries 518 step 3b, 121, 462): a restart with the saved PWM flag is a plain restore, as thermo-nova
+    pwm.restore() (pwm.py:111-115, climate.py:169-176). The flag sets PWM at once, with no wait for a running heater, a known flow or a
+    MsgID 3 reply. Entry 388 stays: no SAT command in the first 60 s. The first control tick with heating demand starts the PWM ON phase
+    on the plain request; a first tick with the heater OFF ends PWM like pwm.disable() (heating_control.py:229-231). The driver sets the
+    flag through SAT_PWMFLAG (no LittleFS here). On the code before ADR-305 the restore was deferred (satRestoreDeferredStep()): the mode
+    stayed continuous at boot, so the first assertion of the cases r1 to r3 is red there."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.exe = build("base")
+
+    ENV = {"SAT_PWMFLAG": "1"}
+
+    def modes(self, r):
+        return [(t, int(x)) for t, x in r.kind("MODE")]
+
+    def test_r1_flag_restores_pwm_at_once_and_sends_nothing_in_the_boot_silence(self):
+        r = Run(self.exe, ["run 59000"], env=self.ENV)
+        self.assertEqual(self.modes(r)[:1], [(10, 2)], "the saved flag did not put the mode on PWM at boot:\n" + r.dump(limit=25))
+        self.assertEqual(r.tx(0, 60000, "CS="), [], "a CS= went out inside the 60 s boot silence (entry 388):\n" + r.dump(limit=25))
+        self.assertEqual(r.tx(0, 60000, "CH="), [], "a CH= went out inside the 60 s boot silence (entry 388):\n" + r.dump(limit=25))
+
+    def test_r2_first_tick_with_heating_demand_starts_the_on_phase_on_the_plain_request(self):
+        r = Run(self.exe, ["run 130000", "snap s"], env=self.ENV)
+        self.assertEqual(self.modes(r), [(10, 2)], "mode events differ, the restore must be the only one:\n" + r.dump(limit=25))
+        ons = [t for t, x in r.kind("PWMPHASE") if x == "ON"]
+        self.assertTrue(ons and ons[0] <= 60000 + 1000, "no PWM ON phase on the first tick after the boot silence: %r\n%s" % (ons, r.dump(limit=25)))
+        cs = r.tx(60000, 61000, "CS=")
+        self.assertTrue(cs and float(cs[0][1][3:]) > 20.0, "no heating CS on the first tick: %r" % cs)
+        w, _ = r.snap("s")
+        self.assertEqual(w["mode"], "2", w)
+
+    def test_r3_first_tick_with_the_heater_off_ends_pwm(self):
+        r = Run(self.exe, ["room 25", "run 130000", "snap s"], env=self.ENV)
+        self.assertEqual(self.modes(r), [(10, 2), (60000, 1)], "PWM must be restored at boot and ended by the first tick with the heater OFF:\n" + r.dump(limit=25))
+        self.assertTrue(r.tx(60000, 61000, "CS=10.0"), "no CS=10.0 (heater off) on the first tick:\n" + r.dump(limit=25))
+        w, _ = r.snap("s")
+        self.assertEqual(w["mode"], "1", w)
+
+    def test_r4_without_the_flag_the_boot_is_continuous(self):
+        r = Run(self.exe, ["run 130000"])
+        self.assertEqual(self.modes(r)[:1], [(10, 1)], r.dump(limit=25))
+
+    def test_r5_mutant_without_the_restore_is_caught(self):
+        exe = build("r5", mutant("SATcontrol.ino", "  if (satLoadPwmEnabled()) satSetControlMode(SAT_MODE_PWM);\n", ""))
+        r = Run(exe, ["run 59000"], env=self.ENV)
+        with self.assertRaises(AssertionError) as cm:
+            self.assertEqual(self.modes(r)[:1], [(10, 2)], "the saved flag did not put the mode on PWM at boot")
+        print("\nMUTANT r5 RED: " + " ".join(str(cm.exception).split())[:200])
 
 
 class Mutants(unittest.TestCase):
