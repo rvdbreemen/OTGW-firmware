@@ -142,7 +142,7 @@ class DisabledStateIsPublished(unittest.TestCase):
         self.assertRegex(h, r'strcasecmp_P\(value, PSTR\("off"\)\) == 0\) \{\s*satHandleEnabled\("0"\);\s*return;')
         self.assertIn("ignored", h)
         self.assertRegex(h, r"SATDebugTf\(PSTR\(\"SAT: control_mode '%s' ignored")
-        self.assertRegex(h, r"satNarratef_P\(PSTR\(\"control_mode '%s' is no longer used")
+        self.assertRegex(h, r"satNarratef_P\(PSTR\(\"control_mode '%(?:\.\d+)?s' is no longer used")
 
     def test_control_mode_command_is_ignored_and_logged(self):
         h = body(self.sat, "void satHandleControlMode(const char* value)")
