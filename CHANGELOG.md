@@ -27,6 +27,7 @@ Build in this beta: beta.496 only (previous public beta: beta.474; beta.475 to b
 - The retained state echo of the SAT settings topics (`sat/weather_lat`, `sat/weather_lon`, `sat/zone_count` and the other static `sat/*` settings) is published only once SAT is not held back by its start gates; setting them over MQTT or REST still works.
 - On a unit without a boiler, a retained margin topic stays stale until SAT is active.
 - On a unit without extra memory, two web pages open at the same time plus other requests can bring the memory low for a moment.
+- **Memory dips on a board without extra memory, seen again in the soak of this build** (TASK-3024). On a board without extra memory the lowest free memory fell to 4080 bytes about 7 minutes after the start and to 624 bytes about 49 minutes after the start, with one critical memory state. The unit recovered within a minute each time, with no restart and no crash; the code is the same as in the benched build. This is similar to the earlier dip described under the known issue of beta.474 (648 bytes in the beta.452 soak). The same unit showed a dip to 2852 bytes with one critical state about 42 minutes after the start in the soak of beta.474, so a later dip is not new either. The cause is not explained yet and the dips vary from start to start.
 
 ## [2.0.0-beta.474] - 2026-11-27
 
