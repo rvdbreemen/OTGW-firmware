@@ -9,7 +9,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-26T13:36:00Z'
-updated_date: '2026-11-27T07:38:00Z'
+updated_date: '2026-11-28T19:45:00Z'
 labels:
   - sat
   - research
@@ -53,4 +53,6 @@ Side fact from the Q-428a draft (queued in the SAT decision register, not asked)
 2026-11-27 REPLAY RESULT (otgw-webui; full report OTGW-field-data/_comms/selftune_replay/REPORT.md, chart indigo_beta428_replay.png, tool scripts/sat_selftune_replay.py in lane ba-tool, local). Baseline replay reproduces the captures' own hourly records (marcel 23/23, indigo 25/25 counted flags, will 25/25). Variant (min_mod only when the room is not under target): indigo beta.428 counts 14 instead of 4 hours, window fills at hour 16, window mean +3.06 C (warm-up +3.10, floating +2.85), raise 2.30 -> 2.35; marcel and will unchanged. Threshold sensitivity: error > 0 raises, error > 0.1 counts 9 hours and gives no decision in 25 h. Answer: yes, conditionally (right direction; one house, 25 h; threshold is a Sergeant D choice; beta.451 run not delivered, not analysed). Open-loop limit: only the first decision and the window means are meaningful. AC2 stays open until the beta.451 run is replayed; AC4 not started (no code before the replay holds).
 
 2026-11-27 P4 (replay regression gate, local, lane ba-tool): tests/test_sat_selftune_replay_gate.py + anonymised fixtures tests/data/selftune_replay/{indigo,marcel,will}.txt.gz (8.4 + 6.5 + 5.7 KB gz; numbers only) built by scripts/sat_selftune_fixture.py. 4 tests green on dev: baseline reproduces every captured hourly counted flag, golden counts and decisions (indigo 4 hours / variant 14 hours and raise 2.30 to 2.35 at hour 16; marcel 15/15; will 0/0), fixture hygiene (size < 50 KB, no IP-like numbers, no host text), and two tuner mutants (default minimum modulation 5 to 1, decision band 1.0 to 0.2) make the gate fail. Report: OTGW-field-data/_comms/selftune_proposals_2026-11-27.md.
+
+Register entry 546 (Robert, #dev-sat-mqtt 1576322428009975940, 2026-11-28 19:42 UTC: 'ADD the auto tune counting at very low power now.'): the scope changes from release 2.1.0 to the NEXT BETA. Behaviour unchanged: Sergeant D's entry 513 (Q-3106b B) stands: an hour at very low power counts only when the room is more than 0.1 C below the target; on indigo_light's 25 h capture only 9 hours count (replay, not re-run). The code is not part of the beta.496 build; it goes into the next combined candidate (57c9bf88c plus this task), banner to be named by poc-dev. Host tests first; unit soak before the beta notes say more. Also entry 546: 'Look at the curve advisor.' is a comparison order (5.1.0 has a curve advisor that only suggests a coefficient), no task yet.
 <!-- SECTION:NOTES:END -->

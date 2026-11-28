@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
-"""Sergeant D entries 385 and 387 (2026-11-16): every SAT heating start runs in PWM first.
+"""TASK-3151.2, ADR-305 (entries 517, 519, 520): a SAT heating start runs in CONTINUOUS. PWM comes only from the overshoot rules.
 
-Thermo-nova starts in continuous and reaches PWM only through the overshoot switch (heating_control.py:229-231, :262-305; pwm.py:63, :89).
-The firmware differs on purpose: a heating start (the heater going OFF -> ON in the control tick, or a boot with no flame burning)
-enters PWM; PWM or continuous is chosen only after the start sequence, which ends 60 s after the first CH flame-on of the start
-(the 60 s start-up follow of entries 344 and 347). Until then the PWM -> continuous exits stay quiet (max setpoint, underheat,
-saturation, the underheat verdict at flame off); the boiler's MsgID 3 veto (entry 214) keeps working.
+This file was the PWM-first test of Sergeant D entries 385 and 387 (2026-11-16): every heating start entered PWM and a 60 s start gate
+silenced the PWM -> continuous exits. ADR-305 replaces ADR-252 in full. Thermo-nova starts in continuous (heating_control.py:229-231:
+without heating demand PWM is off, so every start begins with PWM disabled) and reaches PWM only through the sustained overshoot
+(heating_control.py:262-305) or an OVERSHOOT end-of-cycle verdict (pwm.py:219-227). The inverted cases below pin that.
 
 REAL CODE: the whole SATcontrol.ino / SATcycles.ino / SATpid.ino and the PIC command queue, driven by tests/sat_loop_build.py and the
 stub-clock driver tests/sat_loop_driver.inc (see tests/test_sat_loop_integration.py for what is real and what is a stub). This file adds
-six driver commands by text patch of an in-memory copy of the driver (the shared driver file is not edited):
-  mutecfg 1|0   the boiler stops/starts answering MsgID 3 (the MsgID 3 permission is unknown while muted)
+five driver commands by text patch of an in-memory copy of the driver (the shared driver file is not edited):
+  mutecfg 1|0   the boiler stops/starts answering MsgID 3
   noflame 1|0   the burner cannot ignite
   holdflame 1|0 the burner stays lit whatever CS/CH say (a boiler that was already burning when SAT came on)
   burn          the burner is lit at the start of the run, flow 50 C, ready for holdflame
   cmode <m>     the control_mode command (auto, continuous, pwm) through satHandleControlMode()
-  vetostate     the veto record of the PWM entry gate (path, millis) as one STATE line
 The boiler is the integration driver's first-order model, a plausible combi boiler, not a measurement.
 
-Old-vs-fix: OTGW_SAT_REF=HEAD compiles the SAT sources from `git show HEAD:...` instead of the working tree; every case that
-describes new behaviour fails there (see the commit notes). Cases (g) and the veto side of (b) describe behaviour that is unchanged or
-only recorded differently; (g) has a mutant that drops its guard.
+What "continuous" shows on the wire in this driver: the MODE event stays 1 and every MM= command is MM=100 (the maximum relative
+modulation; a PWM stint sends its own MM values).
+
+Old-vs-fix: extract the parent of the first ADR-305 commit (`git archive f3a3ff52c~1 src tests`), copy this file over its tests/ copy
+and run it there: eight cases fail (a, a2, b, c, d, e, f, i), g and g2 pass on both (SAT coming on mid-burn never entered PWM). Do not use
+OTGW_SAT_REF for this: the old SAT sources do not compile against the new type headers. The mutants edit the new code in memory (they put
+a PWM start back); they are skipped under OTGW_SAT_REF.
 
 Run: python tests/test_sat_pwm_first_start.py
 """
@@ -59,7 +61,6 @@ def patched_driver():
     else if (!strcmp(cmd, "holdflame")) g_holdFlame = atoi(a) != 0;
     else if (!strcmp(cmd, "burn")) { bo.flame = true; bo.ch = true; bo.cs = 60.0f; bo.flow = 50.0f; bo.flameChangeMs = g_ms; statusFrame(); }
     else if (!strcmp(cmd, "cmode")) { char m[16]; sscanf(line, "%*s %15s", m); satHandleControlMode(m); }
-    else if (!strcmp(cmd, "vetostate")) ev("STATE", "veto path=%u ms=%u valid=%d", (unsigned)state.sat.iPwmVetoPath, (unsigned)state.sat.iPwmVetoMs, (int)state.sat.bSlaveCfgValid);
     else return 2;""")
     return d
 
@@ -139,121 +140,93 @@ COLD = ["outside -25", "room 5"]        # a request at the maximum setpoint
 OFF = ["room 25"]                       # request below the cold setpoint: the heater is OFF
 
 
-class PwmFirstStart(unittest.TestCase):
+def pwm_entries(r, a=0, b=10 ** 12):
+    return [t for t, m in r.modes(a, b) if m == 2]
+
+
+def assert_continuous_start(tc, r, what):
+    """No PWM mode at any time, and MM stays at the maximum relative modulation of the continuous mode."""
+    tc.assertEqual(pwm_entries(r), [], "PWM entered %s:\n%s" % (what, r.dump()))
+    mm = [x for _, x in r.tx(0, 10 ** 12, "MM=")]
+    tc.assertTrue(mm, "no MM= command sent at all:\n" + r.dump())
+    tc.assertEqual(set(mm), {"MM=100"}, "MM left the continuous value %s:\n%s" % (what, r.dump()))
+
+
+class ContinuousFirstStart(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.exe = build("base")
 
-    # (a) auto: the heater going OFF -> ON enters PWM before the flame of that start, never while the heater is OFF
-    def test_a_heater_off_to_on_enters_pwm_before_the_flame(self):
+    # (a) auto: the heater going OFF -> ON starts in continuous, the flame lights in continuous
+    def test_a_heater_off_to_on_stays_continuous(self):
         r = Run(self.exe, OFF + ["run 150000", "mark on", "room 15", "run 300000"])   # OFF first: the room is known before the first tick
         on = r.mark("on")
-        self.assertNotIn(2, [m for _, m in r.modes(0, on)], "PWM mode while the heater was OFF:\n" + r.dump(0, on))
-        pwm = [t for t, m in r.modes(on) if m == 2]
-        self.assertTrue(pwm, "no PWM entry at the heating start:\n" + r.dump(on))
-        self.assertLessEqual(pwm[0] - on, 35000, "PWM entry later than one control tick after the demand came:\n" + r.dump(on))
-        fl = r.flame_on(on)
-        self.assertTrue(fl and pwm[0] <= fl[0], "the start must be in PWM when its flame lights: pwm=%s flame=%s\n%s" % (pwm, fl, r.dump(on)))
+        assert_continuous_start(self, r, "at the heating start")
+        self.assertTrue(r.flame_on(on), "the start never lit the burner:\n" + r.dump())
+        self.assertEqual([m for _, m in r.modes(on)], [], "the mode changed after the heating start:\n" + r.dump(on))
 
-    # (a2) requested mode 'pwm' also gets PWM first: the heater OFF ends PWM (ADR-199), the next start enters it again
-    def test_a2_requested_pwm_enters_pwm_at_the_next_start(self):
+    # (a2) requested mode 'pwm' before the start: the heater OFF ends PWM (ADR-199, thermo-nova pwm.disable()), and the next heating
+    # start is again in continuous. (The control_mode command itself is removed in a later release, entry 519.)
+    def test_a2_requested_pwm_ends_with_the_heater_off_and_the_start_is_continuous(self):
         r = Run(self.exe, OFF + ["cmode pwm", "run 150000", "mark on", "room 15", "run 300000"])
         on = r.mark("on")
-        # entries 392/393: the 'pwm' command now enters PWM at once (no MsgID 3 refusal at boot); the first tick after the 60 s boot
-        # silence (entry 388, at 60000) leaves it again because the heater is OFF (ADR-199). From the next tick on nothing may change.
-        self.assertEqual([m for t, m in r.modes(60001, on)], [], "mode changed while the heater was OFF after the first tick:\n" + r.dump(0, on))
+        self.assertEqual(r.modes(60001, on), [], "mode changed while the heater was OFF after the first tick:\n" + r.dump(0, on))
         self.assertEqual(r.modes(0, on)[-1][1], 1, "PWM left on while the heater was OFF:\n" + r.dump(0, on))
-        pwm = [t for t, m in r.modes(on) if m == 2]
-        self.assertTrue(pwm, "no PWM entry at the heating start with control_mode pwm:\n" + r.dump(on))
-        fl = r.flame_on(on)
-        self.assertTrue(fl and pwm[0] <= fl[0], "the start must be in PWM when its flame lights: pwm=%s flame=%s" % (pwm, fl))
+        self.assertEqual(pwm_entries(r, on), [], "the heating start entered PWM:\n" + r.dump(on))
+        self.assertTrue(r.flame_on(on), r.dump())
 
-    # (i) the first PWM phase of a PWM-first entry is ON in the entry tick, and the no-return start-up flood runs at the ignition.
-    # Entry 43 (pwm.py:154-155): the first schedule step after a PWM entry starts ON without the off wait. Entry 387 reason 2: the PWM
-    # start is the warm-up of the boiler components. TASK-1371: a boiler without a return temperature (MsgID 28 Unknown-DataID) gets the
-    # flood (flame-off hold CS and PM=25 for fModSupDelay) from the CH flame edge of an ON phase. Right after a boot there is no flow
-    # temperature yet; PWM would idle and send the plain request (heating_control.py:149-150), the boiler would light on it and no flood
-    # would run. The start therefore waits in continuous until the flow is known and enters PWM on a tick that has it.
-    def test_i_first_phase_after_the_pwm_first_entry_is_on_and_the_flood_runs(self):
-        # entry 388: nothing runs in the 60 s boot silence, so the flow must still be unknown after it for the guard to matter
-        self.run_case(Run(self.exe, ["ret28unknown 1", "mute25 1", "run 70000", "mute25 0", "run 260000"]))
-
-    def run_case(self, r):
-        pwm = [t for t, m in r.modes() if m == 2]
-        self.assertTrue(pwm, "no PWM entry:\n" + r.dump())
-        phase = [x for t, x in r.kind("PWMPHASE") if t == pwm[0]]
-        self.assertEqual(phase[-1:], ["ON"], "the first phase in the PWM entry tick is %r, not ON:\n%s" % (phase, r.dump()))
+    # (i) a boiler without a return temperature (MsgID 28 Unknown-DataID) gets the start-up flood (flame-off hold CS and PM=25 for
+    # fModSupDelay, TASK-1371) at the CH flame edge, in continuous. Right after a boot there is no flow temperature yet (entry 388:
+    # nothing runs in the 60 s boot silence); the start waits for it without any PWM idle state.
+    def run_flood_case(self, r):
+        assert_continuous_start(self, r, "at the start of a boiler without a return temperature")
         fl = r.flame_on(0)
         self.assertTrue(fl, r.dump())
-        self.assertGreaterEqual(fl[0], pwm[0], "the boiler lit before the PWM entry, on a plain request:\n" + r.dump())
         starts = [t for t, x in r.kind("FLOOD") if x == "1"]
         self.assertTrue(starts and 0 <= starts[0] - fl[0] <= 2000, "no start-up flood at the flame edge of the start (flame %s, flood %s):\n%s" % (fl, starts, r.dump()))
         self.assertGreaterEqual(len(r.tx(starts[0], starts[0] + 20000, "PM=25")), 8)
 
-    # (b) entries 392/393: MsgID 3 plays no part in PWM, so a boiler that sets the low-off bit (HB bit 4) still gets the PWM-first
-    # start, with its first phase ON and the no-return flood at the ignition (as case i). Before 392 this bit refused the entry.
-    def test_b_msgid3_low_off_bit_does_not_refuse_the_pwm_start(self):
-        r = Run(self.exe, ["lowoff 1", "ret28unknown 1", "run 200000"])
-        self.run_case(r)
+    def test_i_no_return_start_floods_at_the_flame_edge_in_continuous(self):
+        self.run_flood_case(Run(self.exe, ["ret28unknown 1", "mute25 1", "run 70000", "mute25 0", "run 260000"]))
 
-    # (c) entries 392/393: a boot whose MsgID 3 is never answered still starts in PWM after the 60 s boot silence (entry 388);
-    # before 392 the start waited for the first valid MsgID 3 reply.
-    def test_c_boot_pwm_without_any_msgid3_reply(self):
+    # (b) MsgID 3 plays no part in the mode (entries 392/393): a boiler that sets the low-off bit (HB bit 4) gets the same start
+    def test_b_msgid3_low_off_bit_changes_nothing(self):
+        self.run_flood_case(Run(self.exe, ["lowoff 1", "ret28unknown 1", "run 200000"]))
+
+    # (c) a boot whose MsgID 3 is never answered starts in continuous after the 60 s boot silence (entry 388)
+    def test_c_boot_without_any_msgid3_reply_is_continuous(self):
         r = Run(self.exe, ["mutecfg 1", "run 200000"])
-        pwm = [t for t, m in r.modes() if m == 2]
-        self.assertTrue(pwm, "no PWM-first start while MsgID 3 stays unanswered:\n" + r.dump())
-        fl = r.flame_on(0)
-        self.assertTrue(fl and pwm[0] <= fl[0], "the start must be in PWM when its flame lights: pwm=%s flame=%s" % (pwm, fl))
+        assert_continuous_start(self, r, "at a boot without a MsgID 3 reply")
+        self.assertTrue(r.flame_on(0), r.dump())
 
-    # (d) cold start with the request at the maximum: no PWM -> continuous exit before 60 s after the flame-on; the max exit after
-    def test_d_max_exit_waits_for_the_start_sequence(self):
+    # (d) cold start with the request at the maximum: continuous from the first tick, no PWM stint, no exit to wait for. thermo-nova
+    # disables PWM at a request at or above the maximum (heating_control.py:203-204), now without the 60 s start gate (ADR-305 rule 3).
+    def test_d_request_at_the_maximum_is_continuous_from_the_start(self):
         r = Run(self.exe, COLD + ["run 240000"])
-        m = r.modes()
-        self.assertTrue([1 for _, x in m if x == 2], "no PWM start at the maximum request:\n" + r.dump())
-        t_pwm = [t for t, x in m if x == 2][0]
-        fl = r.flame_on(0)
-        self.assertTrue(fl, "no flame:\n" + r.dump())
-        left = [t for t, x in m if x == 1 and t > t_pwm]
-        self.assertTrue(left, "the max-setpoint exit never fired after the start sequence:\n" + r.dump())
-        self.assertGreaterEqual(left[0] - fl[0], 60000, "left PWM %d ms after the flame-on, inside the start sequence:\n%s" % (left[0] - fl[0], r.dump()))
-        self.assertLessEqual(left[0] - fl[0], 60000 + 35000, "the max exit did not fire on the first tick after the sequence:\n" + r.dump())
+        assert_continuous_start(self, r, "at a request at the maximum")
+        self.assertEqual([m for _, m in r.modes()], [1], "expected one continuous mode event:\n" + r.dump())
+        self.assertTrue(r.flame_on(0), r.dump())
 
-    # (e) saturation: a start whose flame does not light holds PWM (the off-time-0 count runs from the start); after the flame the exit works
-    def test_e_saturation_exit_blocked_until_the_flame_and_60s(self):
-        script = OFF + ["noflame 1", "run 60000", "room 15", "run 700000", "mark lit", "noflame 0", "run 900000"]
-        r = Run(self.exe, script)
+    # (e) a start whose burner does not light: nothing enters PWM while it waits (the old saturation count ran from a PWM entry at
+    # the start), and the late ignition is a continuous start too
+    def test_e_start_without_a_flame_stays_continuous(self):
+        r = Run(self.exe, OFF + ["noflame 1", "run 60000", "room 15", "run 700000", "mark lit", "noflame 0", "run 900000"])
         lit = r.mark("lit")
-        t_pwm = [t for t, x in r.modes() if x == 2]
-        self.assertTrue(t_pwm, "no PWM start:\n" + r.dump())
-        self.assertEqual([t for t, x in r.modes(t_pwm[0], lit) if x == 1], [], "a PWM -> continuous exit fired while the flame of the start had not lit:\n" + r.dump(0, lit + 1))
-        fl = r.flame_on(lit)
-        self.assertTrue(fl, r.dump())
-        left = [t for t, x in r.modes(lit) if x == 1]
-        self.assertTrue(left, "the exit never fired after the start sequence:\n" + r.dump())
-        self.assertGreaterEqual(left[0] - fl[0], 60000)
-        self.assertLessEqual(left[0] - fl[0], 60000 + 35000, "the exit did not fire on the first tick after the sequence:\n" + r.dump())
-        # control: without the guards in satCycleCheckPwmExits() the saturation exit fires long before the flame lit
-        nog = build("noguard", {"SATcycles.ino": [("SAT_UNDERHEAT_SUSTAIN_MS) && !satStartGateActive()) {", "SAT_UNDERHEAT_SUSTAIN_MS)) {"),
-                                                   ("SAT_SATURATION_SUSTAIN_MS) && !satStartGateActive()) {", "SAT_SATURATION_SUSTAIN_MS)) {")]})
-        r2 = Run(nog, script)
-        t2 = [t for t, x in r2.modes() if x == 2]
-        early = [t for t, x in r2.modes(t2[0], r2.mark("lit")) if x == 1] if t2 else []
-        self.assertTrue(early, "control run without the guard did not exit before the flame lit; the test would prove nothing:\n" + r2.dump())
+        assert_continuous_start(self, r, "while the burner did not light")
+        self.assertTrue(r.flame_on(lit), r.dump())
 
-    # (f) PWM -> continuous in the middle of the burn is no new start: no second 348 flood
-    def test_f_mid_burn_switch_runs_no_second_start_sequence(self):
+    # (f) a low-off bit that appears in the middle of a burn changes nothing (the mid-burn switch of the old PWM-first start is gone):
+    # one burn, one start-up flood, no mode event, no second PM=25
+    def test_f_mid_burn_low_off_bit_runs_no_second_start_sequence(self):
         r = Run(self.exe, OFF + ["ret28unknown 1", "run 40000", "room 15", "run 125000", "mark veto", "lowoff 1", "run 330000"])
-        m = r.modes()
-        self.assertEqual([x for _, x in m], [1, 2, 1], "expected continuous, PWM start, veto back to continuous: %r\n%s" % (m, r.dump()))
-        veto = r.mark("veto")
-        self.assertGreater(m[2][0], veto)
+        self.assertEqual([x for _, x in r.modes()], [1], "expected one continuous mode event: %r\n%s" % (r.modes(), r.dump()))
         fl = r.flame_on(0)
         self.assertEqual(len(fl), 1, "more than one ignition in the run, the case needs one burn:\n" + r.dump())
         starts = [t for t, x in r.kind("FLOOD") if x == "1"]
         self.assertEqual(len(starts), 1, "the start-up flood ran %d times in one burn: %r\n%s" % (len(starts), starts, r.dump()))
-        self.assertEqual(r.tx(m[2][0] - 500, 10 ** 12, "PM=25"), [], "PM=25 of a start-up flood after the mid-burn switch:\n" + r.dump())
+        self.assertEqual(r.tx(r.mark("veto"), 10 ** 12, "PM=25"), [], "PM=25 of a start-up flood after the low-off bit:\n" + r.dump())
 
-    # (g) SAT switched on while a flame already burns: unchanged, no PWM entry (mutant below shows the guard is what holds it)
+    # (g) SAT switched on while a flame already burns: no PWM entry (passes on the old code too; the guard is _sat_flameOffSeen)
     def test_g_enabled_mid_burn_stays_continuous(self):
         r = Run(self.exe, ["burn", "holdflame 1", "run 50000"])
         self.assertNotIn(2, [m for _, m in r.modes()], "PWM although SAT came on while the flame burned:\n" + r.dump())
@@ -265,69 +238,31 @@ class PwmFirstStart(unittest.TestCase):
         r = Run(self.exe, self.G2)
         self.assertNotIn(2, [m for _, m in r.modes()], "PWM although SAT resumed while the flame burned:\n" + r.dump())
 
-    # (h) removed: the entry 214 low-load veto that ended PWM inside the start sequence no longer exists (entries 392/393,
-    # TASK-2000); with entry 394 nothing ends PWM inside the 60 s, which cases d and e pin.
-
 
 @unittest.skipIf(REF, "the mutants edit the new code; they have no target in the reference source")
 class Mutants(unittest.TestCase):
-    def test_i_mutant_entering_pwm_without_a_flow_temperature_loses_the_flood(self):
-        # the first version of the entry: PWM at the first tick although the flow is unknown (PWM idles, plain request, boiler lights, no flood)
-        exe = build("i_mut", {"SATcontrol.ino": [("  if (satGetFlowTemp() <= 0.0f) { _sat_startPwmWanted = true; return; }\n  satSetControlMode(SAT_MODE_PWM);", "  satSetControlMode(SAT_MODE_PWM);")]})
-        r = Run(exe, ["ret28unknown 1", "mute25 1", "run 70000", "mute25 0", "run 260000"])
+    """A rewritten case must still be able to fail: put a PWM start back in memory and the cases of ContinuousFirstStart go red."""
+
+    # the heating-start entry of ADR-252 in its simplest form: heating demand and continuous -> PWM
+    MUT = {"SATcontrol.ino": [("  if (state.sat.bModSuppressed) { if (state.sat.iModSuppressionSinceMs == 0)",
+                               "  if (!coldCutoff && state.sat.eControlMode == SAT_MODE_CONTINUOUS) satSetControlMode(SAT_MODE_PWM);   // MUTANT\n"
+                               "  if (state.sat.bModSuppressed) { if (state.sat.iModSuppressionSinceMs == 0)")]}
+
+    def red(self, name, label):
+        t = ContinuousFirstStart(name)
+        t.exe = build("pwm_start_mut", self.MUT)
         with self.assertRaises(AssertionError) as cm:
-            PwmFirstStart("test_i_first_phase_after_the_pwm_first_entry_is_on_and_the_flood_runs").run_case(r)
-        print("\nMUTANT i RED: " + " ".join(str(cm.exception).split())[:300])
+            getattr(t, name)()
+        print("\nMUTANT %s RED: %s" % (label, " ".join(str(cm.exception).split())[:200]))
 
-    def test_g2_mutant_without_the_flame_reset_in_satdisable_enters_pwm_on_resume(self):
-        exe = build("g2_mut", {"SATcontrol.ino": [("  _sat_flameOffSeen = false;           // a pause (OpenTherm loss, trip, fallback lift)", "  // MUTANT (pause)")]})
-        r = Run(exe, PwmFirstStart.G2)
-        self.assertIn(2, [m for _, m in r.modes()], "mutant should enter PWM on resume mid-burn:\n" + r.dump())
+    def test_a_mutant_pwm_at_the_heating_start_is_caught(self):
+        self.red("test_a_heater_off_to_on_stays_continuous", "a")
 
-    def test_g_mutant_without_the_flame_off_guard_enters_pwm_mid_burn(self):
-        exe = build("g_mut", {"SATcontrol.ino": [("SAT_MODE_CONTINUOUS || !_sat_flameOffSeen) {", "SAT_MODE_CONTINUOUS) {")]})
-        r = Run(exe, ["burn", "holdflame 1", "run 120000"])   # past the 60 s boot silence of entry 388
-        self.assertIn(2, [m for _, m in r.modes()], "mutant should enter PWM mid-burn:\n" + r.dump())
+    def test_d_mutant_pwm_at_the_maximum_request_is_caught(self):
+        self.red("test_d_request_at_the_maximum_is_continuous_from_the_start", "d")
 
-    def test_e_underheat_exit_is_gated(self):
-        # With the start sequence lengthened to 400 s (in memory), the underheat exit is held back by the gate and fires only
-        # after it. TASK-3008 (entries 448, 456): the underheat count starts once the flame has burned 180 s and needs 180 s,
-        # so its earliest exit is about 360 s after ignition; the real 60 s gate can no longer hold anything back.
-        edits = {"SATcontrol.ino": [("static const uint32_t SAT_START_GATE_MS = 60000UL;", "static const uint32_t SAT_START_GATE_MS = 400000UL;")]}
-        long_exe = build("gate400", edits)
-        # TASK-2993 (entries 437/438): room 19.5 gives a request of 42.4 C against a flow of 31-33 C, a real underheat. With the default
-        # room the flow passes the request at 180 s and the live-flow duty leaves range 5, so no exit exists to hold back
-        # (test_boiler_above_the_request_gets_no_saturation_exit pins that).
-        r = Run(long_exe, ["room 19.5", "run 700000"])
-        t_pwm = [t for t, x in r.modes() if x == 2]
-        fl = r.flame_on(0)
-        self.assertTrue(t_pwm and fl, r.dump())
-        left = [t for t, x in r.modes() if x == 1 and t > t_pwm[0]]
-        self.assertTrue(left, "no exit at all:\n" + r.dump())
-        self.assertGreaterEqual(left[0] - fl[0], 400000, "an exit fired %d ms after the flame-on, inside the 400 s gate:\n%s" % (left[0] - fl[0], r.dump()))
-        # control: without the gate guards the same run exits earlier
-        nog = build("gate400_noguard", {"SATcontrol.ino": edits["SATcontrol.ino"],
-                                         "SATcycles.ino": [("SAT_UNDERHEAT_SUSTAIN_MS) && !satStartGateActive()) {", "SAT_UNDERHEAT_SUSTAIN_MS)) {"),
-                                                           ("SAT_SATURATION_SUSTAIN_MS) && !satStartGateActive()) {", "SAT_SATURATION_SUSTAIN_MS)) {")]})
-        r2 = Run(nog, ["room 19.5", "run 700000"])
-        left2 = [t for t, x in r2.modes() if x == 1 and t > [t2 for t2, y in r2.modes() if y == 2][0]]
-        self.assertTrue(left2 and left2[0] - r2.flame_on(0)[0] < 400000, "control run without the guard did not exit early:\n" + r2.dump())
-
-
-class LiveFlowDuty2993(unittest.TestCase):
-    def test_boiler_above_the_request_gets_no_saturation_exit(self):
-        # TASK-2993 (Sergeant D entries 437/438): the default heating start (request 31.8 C) with the simulated boiler: the flow rises
-        # past the request at about 180 s (CS = flow - 1). The start sequence is lengthened to 200 s (in memory) so the underheat exit
-        # (request above the flow at 90-150 s) is held back until the flow is above the request; what is left is the saturation exit.
-        # The duty uses the live flow, so it leaves range 5 (off time 0) once the flow is above the request and no saturation exit
-        # follows; with the held BT (ignition flow ~30 C) the duty stayed at range 5 and the saturation exit ended PWM (the
-        # indigo_light 19 Nov 21:32:30 pattern). Red on the code before TASK-2993.
-        edits = {"SATcontrol.ino": [("static const uint32_t SAT_START_GATE_MS = 60000UL;", "static const uint32_t SAT_START_GATE_MS = 200000UL;")]}
-        r = Run(build("gate200", edits), ["run 400000"])
-        pwm = [t for t, x in r.modes() if x == 2]
-        self.assertTrue(pwm and r.flame_on(0), r.dump())
-        self.assertEqual([t for t, x in r.modes() if x == 1 and t > pwm[0]], [],
-                         "PWM ended although the boiler delivers above the request: " + r.dump())
+    def test_i_mutant_pwm_at_a_no_return_start_is_caught(self):
+        self.red("test_i_no_return_start_floods_at_the_flame_edge_in_continuous", "i")
 
 
 if __name__ == "__main__":

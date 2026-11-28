@@ -103,7 +103,28 @@ MIGRATE_REST_OFFSET="0xE000"
 # TASK-2028: --update offsets, as flash_otgw.bat (partitions_otgw_esp32.csv, ADR-191: safeboot layout).
 APP_OFFSET="0x100000"
 FS_OFFSET="0x330000"
-TOOL_LAYOUT="safeboot"
+# The table these images are built for, told by the size of app0 in partitions_otgw_esp32.csv (not by the name
+# "safeboot": two tables share the names, and a write at the other table's offsets lands inside its filesystem).
+TOOL_APP0_SIZE="0x230000"
+
+# Layout name for an app0 size read from a partition table (empty size = no app0 entry found).
+layout_name_for_size() {
+    case "$1" in
+        0x230000) echo "safeboot" ;;    # ADR-191: app0 2240K, LittleFS 768K at 0x330000
+        0x240000) echo "safeboot2" ;;   # app0 2304K, LittleFS 704K at 0x340000
+        "")       echo "legacy" ;;
+        *)        echo "unknown(app0=$1)" ;;
+    esac
+}
+
+# Size of the app0 entry in a partition table dump: 32-byte entries, label at +12, size (LE) at +8.
+partition_app0_size() {
+    local off b0 b1 b2 b3
+    off="$(LC_ALL=C grep -boa 'app0' "$1" | head -n1 | cut -d: -f1)"
+    [ -n "$off" ] && [ "$off" -ge 4 ] || return 0
+    read -r b0 b1 b2 b3 < <(od -An -tu1 -j $((off - 4)) -N4 "$1")
+    printf '0x%X' $(( b0 + b1 * 256 + b2 * 65536 + b3 * 16777216 ))
+}
 
 # ---- Help ------------------------------------------------------------------
 show_help() {
@@ -414,7 +435,7 @@ update_flow() {
     [ -n "$app" ] && ok "Firmware: $(basename "$app") -> $APP_OFFSET"
     [ -n "$fs" ]  && ok "Filesys:  $(basename "$fs") -> $FS_OFFSET"
 
-    local port_args baud pt layout
+    local port_args baud pt layout unit_app0 tool_layout
     baud="${ARG_BAUD:-921600}"
     if [ -n "$ARG_PORT" ]; then port_args="--port $ARG_PORT"
     else port_args="--port-filter vid=0x303A --port-filter pid=0x1001 --port-filter pid=0x4001"; fi
@@ -425,13 +446,19 @@ update_flow() {
     "$ESPTOOL_BIN" --chip esp32s3 $port_args --baud "$baud" --before default_reset --after no_reset \
         read_flash 0x8000 0x1000 "$pt" >/dev/null \
         || { rm -f "$pt"; err "Could not read the partition table from the unit."; exit 1; }
+    unit_app0="$(partition_app0_size "$pt")"
     layout="legacy"
-    if LC_ALL=C grep -aq "safeboot" "$pt"; then layout="safeboot"; fi
+    if LC_ALL=C grep -aq "safeboot" "$pt"; then layout="$(layout_name_for_size "$unit_app0")"; fi
     rm -f "$pt"
-    ok "Unit layout: $layout   images: $TOOL_LAYOUT"
-    if [ "$layout" != "$TOOL_LAYOUT" ]; then
-        err "This unit uses the $layout partition layout; these images are for $TOOL_LAYOUT."
-        echo "        Run a one-time migration first:  ./flash_otgw.sh --migrate --host <device ip>" >&2
+    tool_layout="$(layout_name_for_size "$TOOL_APP0_SIZE")"
+    ok "Unit layout: $layout   images: $tool_layout"
+    if [ "$layout" != "$tool_layout" ]; then
+        err "This unit uses the $layout partition layout; these images are for $tool_layout."
+        if [ "$layout" = "legacy" ] || [ "$layout" = "safeboot" ]; then
+            echo "        Run a one-time migration first:  ./flash_otgw.sh --migrate --host <device ip>" >&2
+        else
+            echo "        These images do not match that layout; use the flash package of the firmware the unit runs, or a full factory flash." >&2
+        fi
         exit 1
     fi
 

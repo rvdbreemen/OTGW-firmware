@@ -54,7 +54,7 @@ static const int SAT_DHW_SETPOINT_MIN = 30, SAT_DHW_SETPOINT_MAX = 65;
 static const uint8_t SAT_MAX_ZONES = 4, SAT_MAX_AREAS = 4;
 enum { SAT_HSYS_AUTO = 0, SAT_HSYS_RADIATORS = 1, SAT_HSYS_UNDERFLOOR = 2 };
 struct SatSettings {
-  bool bSimulation = true; float fDhwSetpoint = 50, fOvershootMargin = 2.0f, fPwmSwitchMargin = 1.5f; uint8_t iMaxRelModulation = 100;
+  bool bSimulation = true; float fDhwSetpoint = 50, fPwmSwitchMargin = 3.0f; uint8_t iMaxRelModulation = 100;
   float fBoilerCapacity = 24.0f, fMaxSetpoint = 65.0f, fTargetTemp = 20.0f, fSimHeatRate = 0.5f, fSimCoolRate = 0.1f;
   uint8_t iZoneCount = 1; bool bMultiArea = false; uint8_t iMultiAreaCount = 0; uint8_t iHeatingSystem = 1;
 };

@@ -581,6 +581,28 @@ def _read_fs_offset_from_csv(default="0x330000"):
     return default
 
 
+def components_without_table_problem(artifacts):
+    """Error text when ESP32 component images would be written without the partition table that places them, else None.
+
+    The app and the LittleFS image go to the offsets of partitions_otgw_esp32.csv. Written alone they land wherever the
+    unit's own table puts things: the table of one release differs from another's in the app0 size and the LittleFS
+    offset (the +64K repartition), so a filesystem image written at the new offset onto a unit with the old table
+    corrupts that unit. This tool cannot read the unit's table, so it writes the table together with the images
+    (a merged image, or the components with the partition table) and refuses everything else; flash_otgw.bat /
+    flash_otgw.sh --update read the unit's table first and are the tools for an update that keeps the table."""
+    if "partitions" in artifacts and not ("firmware" in artifacts and "filesystem" in artifacts):
+        return ("Refusing to write a partition table without both the firmware and the filesystem image: a new table "
+                "moves the filesystem, and the old one would be left at an offset the unit no longer uses (settings "
+                "lost). Give the full set (firmware, filesystem, partition table), use the merged-full image, or use "
+                "flash_otgw --migrate.")
+    if ("firmware" in artifacts or "filesystem" in artifacts) and "partitions" not in artifacts:
+        return ("Refusing to write the firmware or filesystem image without a partition table: this tool cannot check "
+                "which table the unit has, and a write at the wrong offsets damages it. Use the merged image, add the "
+                "partition table (esp32-partitions.bin), or use flash_otgw.bat / flash_otgw.sh --update, which read the "
+                "unit's table first.")
+    return None
+
+
 def flash_device(board, port, artifacts, baud=None, do_erase=False):
     """Flash the device. Handles both ESP8266 and ESP32."""
     cfg = BOARD_CONFIGS[board]
@@ -637,6 +659,10 @@ def flash_device(board, port, artifacts, baud=None, do_erase=False):
         print_header(f"Flashing {cfg['name']}")
 
         if board == "esp32":
+            problem = components_without_table_problem(artifacts)
+            if problem:
+                print_error(problem)
+                return False
             # Individual components
             if "bootloader" in artifacts:
                 cmd.extend([cfg["bootloader_address"], str(artifacts["bootloader"])])

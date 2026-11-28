@@ -389,7 +389,7 @@ Free heap is below 4 KB. The firmware's heap gate blocks new HTTP connections in
 |-------|-------------|
 | `none` | No complete cycle yet observed |
 | `good` | Cycle reached setpoint with acceptable overshoot |
-| `overshoot` | Flow temperature exceeded setpoint + overshoot margin |
+| `overshoot` | Flow temperature exceeded setpoint + the PWM switch margin |
 | `underheat` | Cycle ended before reaching setpoint; demand not met |
 | `short` | Cycle duration too short (below minimum on-time); short cycling |
 | `uncertain` | Insufficient data to classify |

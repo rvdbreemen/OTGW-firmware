@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.496] - 2026-11-28
+
+Build in this beta: beta.496 only (previous public beta: beta.474; beta.475 to beta.495 were internal builds and were never published). The exact build (2.0.0-beta.496+313c4ba) ran 72 minutes on a board without a PIC and 63 minutes on a Classic with an S3 module and extra memory, without a restart, crash or watchdog and with MQTT connected in every sample; the free space of the filesystem was not measured. The release image is soaked for one hour on a test unit before it is published; the result is in the release post.
+
+### Changed
+- SAT: switching between continuous and PWM follows the original design. Every heating run starts in continuous mode; PWM starts only when the flow stays at least the switch margin above the request for 60 seconds; PWM ends after 180 seconds with the flow 3.0 C below the request (no flame-age wait), after 300 seconds without off time, when the request reaches the maximum setpoint, or when heating ends. The flame-out fail-safe, the limit of one PWM entry per flame, the 60 second start gate and the wait for the boiler's configuration reply are gone (TASK-3151).
+- SAT: the setting "PWM switch margin" (`satpwmswitchmargin`) defaults to 3.0 C (it was 2.0 C) and is the only overshoot margin, also for the cycle class OVERSHOOT; a stored 1.5 or 2.0 is moved once to 3.0, a value you set yourself stays; the setting "Overshoot margin" (`satovershootmargin`), the topic `sat/overshoot_margin` and the Home Assistant entity "SAT Overshoot Margin" are removed (TASK-3151).
+- SAT: hot water no longer pauses the PWM clock, a PWM start is no longer held back by a burning hot-water flame, the PWM ON time starts over when PWM ends, and a request that falls to the cold setpoint switches heating off at once, without waiting for 180 seconds of flame (TASK-3151).
+- SAT, MQTT: the command `sat/control_mode` is ignored and only writes a log line; `off` still switches SAT off (TASK-3151).
+- SAT: no `MM=T` while PWM runs; a gas boiler gets modulation 0 in PWM and the configured maximum in continuous mode; `MM=T` goes out only when SAT is switched off or after a restart (TASK-3143).
+- SAT: the heating-failure 15 minute window restarts in a tolerance-band pause, so the warning stays silent there (TASK-3112).
+- Web UI, graph: the Monitor graph and the CSV show the room temperature SAT controls on as its own series (TASK-3007).
+- Web UI: settings help in Dutch, German and Greek (166 texts per language, TASK-2927); boards without a PIC hide the rows that do not apply, the LED setting says what it does, an S0 pin of -1 shows an empty field with a hint (TASK-3121).
+- Update safety: `GET /api/v2/device/info` shows `partition_layout`; the update page and `ota_flash.py` refuse an image built for another flash layout, `flash_esp` refuses to write the firmware or filesystem image without a partition table, the USB update of `flash_otgw` tells the layout from the size of the first app slot, and a refused filesystem upload leaves the filesystem mounted (TASK-3128, TASK-2980).
+- Capture tool: the browser capture re-attaches after a DevTools connection error, and a silent telnet or WebSocket stream is reconnected (TASK-2979, TASK-3009).
+- Documentation: manual, API reference and SAT specification follow the new mode switching; a 3.3 V warning for the DI and 1-wire pads of boards with a terminal block.
+- Internal: 87 changes in tests, documentation and decisions, task administration and tooling; nothing to do for users.
+
+### Known issues
+- The retained state echo of the SAT settings topics (`sat/weather_lat`, `sat/weather_lon`, `sat/zone_count` and the other static `sat/*` settings) is published only once SAT is not held back by its start gates; setting them over MQTT or REST still works.
+- On a unit without a boiler, a retained margin topic stays stale until SAT is active.
+- On a unit without extra memory, two web pages open at the same time plus other requests can bring the memory low for a moment.
+- **Memory dips on a board without extra memory, seen again in the soak of this build** (TASK-3024). On a board without extra memory the lowest free memory fell to 4080 bytes about 7 minutes after the start and to 624 bytes about 49 minutes after the start, with one critical memory state. The unit recovered within a minute each time, with no restart and no crash; the code is the same as in the benched build. This is similar to the earlier dip described under the known issue of beta.474 (648 bytes in the beta.452 soak). The same unit showed a dip to 2852 bytes with one critical state about 42 minutes after the start in the soak of beta.474, so a later dip is not new either. The cause is not explained yet and the dips vary from start to start.
+
 ## [2.0.0-beta.474] - 2026-11-27
 
 Build in this beta: beta.474 only (previous public beta: beta.458; beta.459 to beta.473 were internal builds and were never published). The exact build (2.0.0-beta.474+7d20639) ran 62 minutes on a Classic with an S3 module and extra memory and 60 minutes on an OT-Direct board without extra memory, without a restart or a crash; a first run on the board without extra memory, overlapped by two web page sessions of our tester, reached a critical memory state once and recovered by itself.
@@ -1297,7 +1321,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.474...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.496...HEAD
+[2.0.0-beta.496]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.474...v2.0.0-beta.496
 [2.0.0-beta.474]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.458...v2.0.0-beta.474
 [2.0.0-beta.458]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.458
 [2.0.0-beta.452]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.451...v2.0.0-beta.452

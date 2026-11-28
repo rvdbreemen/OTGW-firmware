@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : graphHistoryStuff.ino
-**  Version  : v2.0.0-beta.474
+**  Version  : v2.0.0-beta.496
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -61,6 +61,13 @@ void graphHistoryTick()
   s.roomSet = graphHistEncTemp(OTcurrentSystemState.TrSet,   graphHistSeen(16));
   // TASK-2018 (ADR-256): the target SAT regulates to (target_temp of /api/v2/sat/status), only while SAT is enabled.
   s.satTarget = graphHistEncTemp(settings.sat.fTargetTemp, satIsEnabled());
+  // TASK-3007 (ADR-291): the room SAT regulates on (the value of satGetRoomTemp(), /api/v2/sat/status room_temp), only while
+  // SAT is enabled and its room is not lost; satRoomForHistory() is NAN when no source has a usable value.
+  {
+    const bool satOn = satIsEnabled() && !state.sat.bRoomTempLost;
+    const float satRoomC = satOn ? satRoomForHistory() : NAN;
+    s.satRoom = graphHistEncTemp(satRoomC, satOn && !isnan(satRoomC));
+  }
   // TASK-1578: a slot taken during a room dropout stores no value (same rule as the live graph).
   const uint16_t trAt = getMsgLastUpdated(24);   // 0 = never reported
   s.room    = graphHistEncRoom(OTcurrentSystemState.Tr, trAt != 0, satIsEnabled() && state.sat.bRoomTempLost,

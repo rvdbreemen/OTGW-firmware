@@ -64,7 +64,7 @@ static void satNarratef_P(const char *fmt, ...) {   // SAT log sink: one "N <tex
 #define SAT_QUIRK_IMMERGAS_TP 0x02
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
-struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fOvershootMargin=2.0f; float fPwmSwitchMargin=1.5f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
+struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fPwmSwitchMargin=3.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
                      int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2;
                      int iHeatingMode=0; };   // TASK-1440: ECO gate on the zones and the solar offset
 struct Settings { SatSettings sat; };
@@ -109,11 +109,6 @@ static bool hasOTCommandInterface() { return g_hasOT; }
 static bool satEnqueueIfChangedCS(float cs) { g_csSent++; g_csLast = cs; return true; }
 void satCycleResetSustainGuards();                                    // defined in the cut SATcycles block
 void satCycleSkipAutoSwitch();                                        // idem (TASK-1367; a no-op stub on HEAD)
-// TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted
-static bool satPwmPermitted() { return true; }
-static void satPwmNoteRefused(uint8_t) {}
-static bool satPwmEntryAllowed(uint8_t) { return true; }
-static bool satCycleCheckLowLoadVeto() { return false; }
 
 #define DUE(t) (g_due)
 #define timerSATSuppress 0
@@ -210,9 +205,9 @@ int main(int argc, char** argv) {
 #ifdef HAS_SWITCH_TICK
     state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false;
     satPwmReset(); _pwm_effectiveBoilerTemp = 47.2f; g_flameOffStart = g_ms - 600000UL; _pwm_lastUpdateMs = g_ms - 600000UL;
-    // 37.5 >= 35 + 2: a sustained overshoot below the 3.0 K fail-safe (TASK-1762, entry 429), so the 60 s rule fires. argv[5] (optional): another
-    // flow, e.g. 45 (the pre-TASK-1762 input, 10 K over): the fail-safe fires after 30 s.
-    g_flow = (argc > 5) ? (float)atof(argv[5]) : 37.5f; setPrev(40.0f);
+    // 38.5 >= 35 + 3 (the switch margin default): a sustained overshoot, so the 60 s rule fires. argv[5] (optional): another
+    // flow, e.g. 45 (10 K over): the same 60 s rule fires (the 30 s fail-safe is gone, TASK-3151.1).
+    g_flow = (argc > 5) ? (float)atof(argv[5]) : 38.5f; setPrev(40.0f);
     float cs = 0; int ticks = 0; int contBefore = 0;
     for (; ticks < 400; ticks++) {
       g_ms += (argc > 4) ? (uint32_t)strtoul(argv[4], 0, 10) : 1000UL; _sat_tickMs = g_ms;   // argv[4]: tick interval in ms (TASK-1412.8)
@@ -512,24 +507,7 @@ def extract(src: str) -> str:
     clock = "static uint32_t _sat_tickMs = 0;\n" if "static uint32_t _sat_tickMs" not in block + tick else ""
     # TASK-3039 (entry 479): the resumed ON phase reads the real CH flame-on, which sits above the cut (SATcontrol.ino ~960)
     clock += "static uint32_t _sat_chFlameOnMs = 0;\n" if "_sat_chFlameOnMs" in block + tick and "static uint32_t _sat_chFlameOnMs" not in block + tick else ""
-    return clock + start_gate_prelude(src, block + tick) + block + "\n" + mm + "\n" + tick
-
-
-def start_gate_prelude(src: str, body: str) -> str:
-    """TASK-1942 (entries 385/387/389/391): the real start gate (its state and satStartGateActive()) sits above the PWM
-    block in SATcontrol.ino; satSetControlMode() and satDisable() clear it, the flame edge anchors it and the PWM exits read
-    it, so a harness that cuts any of those needs it. Returns the gate block when `src` has it and `body` does not, plus a
-    no-op satPwmFirstStart() when `body` calls it without defining it (the heating start has many dependencies;
-    tests/test_sat_pwm_first_start.py runs the real one). Empty on code before TASK-1942."""
-    if "static const uint32_t SAT_START_GATE_MS" not in src or "static const uint32_t SAT_START_GATE_MS" in body:
-        return ""
-    src = src.replace("\r\n", "\n")
-    g0 = src.index("static const uint32_t SAT_START_GATE_MS")
-    g1 = src.index("\n}\n", src.index("static bool satStartGateActive()")) + 3
-    gate = src[g0:g1] + "\n"
-    if "satPwmFirstStart()" in body and "static void satPwmFirstStart()" not in body:
-        gate += "static void satPwmFirstStart() {}\n"
-    return gate
+    return clock + block + "\n" + mm + "\n" + tick
 
 
 def _vcvars():
@@ -954,13 +932,14 @@ class SatPwmOverride(unittest.TestCase):
                     self.assertEqual(r["ch"], "1", r)
 
     # TASK-1762: the old input of the case above (flow 45 against request 35, 10 K over) now switches through the flame-out
-    # fail-safe 30 s after the first qualifying tick, and the switch tick still sends the PWM setpoint (Q47 A, entry 88).
-    def test_failsafe_switch_tick_sends_the_pwm_setpoint_after_30s(self):
+    # TASK-3151.1: the flame-out fail-safe is gone (entries 517, 519). A flow 10 K over the request now switches by the one overshoot rule,
+    # 60 s after the first qualifying tick, and the switch tick still sends the PWM setpoint (Q47 A, entry 88).
+    def test_large_overshoot_switch_tick_sends_the_pwm_setpoint_after_60s(self):
         r = self.run_sc("swtick", 1, "x", 1000, 45)
         self.assertEqual(r["mode"], "2", r)
-        self.assertEqual(r["ticks"], "31", r)                       # first qualifying tick starts the timer, 30 s later it fires
-        self.assertEqual(r["continuous_ticks"], "30", r)
-        self.assertEqual(r["cont_marker"], "0", "the fail-safe switch tick sent the continuous setpoint: %r" % r)
+        self.assertEqual(r["ticks"], "61", r)                       # first qualifying tick starts the timer, 60 s later it fires
+        self.assertEqual(r["continuous_ticks"], "60", r)
+        self.assertEqual(r["cont_marker"], "0", "the switch tick sent the continuous setpoint: %r" % r)
         self.assertEqual(r["cs"], "48.0", r)
         self.assertEqual(r["ch"], "1", r)
 

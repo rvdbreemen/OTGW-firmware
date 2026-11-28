@@ -155,8 +155,8 @@ def build(workdir: Path):
         stubs = stubs.replace(line, "")
     stubs = re.sub(r"^static uint32_t satGetMinOffTimeSec\(\).*\n", "", stubs, flags=re.M)   # TASK-1542: real getter below
     stubs = re.sub(r"^static uint32_t satGetPwmPeriodSec\(\).*\n", "", stubs, flags=re.M)
-    stubs = stubs.replace("float fOvershootMargin=2.0f;",
-                          "uint8_t iCyclesPerHour=3; uint16_t iHpCycleSeconds=1800; float fOvershootMargin=2.0f;")
+    stubs = stubs.replace("float fPwmSwitchMargin=3.0f;",
+                          "uint8_t iCyclesPerHour=3; uint16_t iHpCycleSeconds=1800; float fPwmSwitchMargin=3.0f;")
     stubs = (stubs.replace("@FORCEFIELD@", "bool bForcePWM=false;" if has_force else "")
                   .replace("@AUTOFIELD@", "bool bPwmAutoSwitch=true;" if has_auto else "")
                   .replace("@CHENABLE@", (REPO / "src" / "OTGW-firmware" / "SATchEnable.h").as_posix()))

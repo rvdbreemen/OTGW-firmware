@@ -28,7 +28,8 @@ SRC = HERE.parent / "src" / "OTGW-firmware"
 HDR = Path(os.environ.get("OTGW_UPDSRV_H", SRC / "OTGW-ModUpdateServer-esp32.h"))
 REST = SRC / "restAPI.ino"
 
-FUNCS = ("hasSpareAppOtaSlot", "safebootPartition", "hasSafeboot", "firmwareOtaPathFor", "firmwareOtaPath")
+FUNCS = ("hasSpareAppOtaSlot", "safebootPartition", "hasSafeboot", "firmwareOtaPathFor", "firmwareOtaPath",
+         "partitionLayoutFor", "partitionLayout", "partitionLayoutExpected")
 
 
 def extract(text: str, name: str) -> str:
@@ -46,6 +47,9 @@ def extract(text: str, name: str) -> str:
 
 
 PRELUDE = r"""
+#ifdef _MSC_VER
+#define __attribute__(x)
+#endif
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -55,7 +59,7 @@ typedef int esp_err_t;
 enum { ESP_PARTITION_TYPE_APP = 0 };
 enum { ESP_PARTITION_SUBTYPE_APP_FACTORY = 0x00, ESP_PARTITION_SUBTYPE_APP_OTA_0 = 0x10,
        ESP_PARTITION_SUBTYPE_APP_OTA_MAX = 0x20 };
-struct esp_partition_t { int type; int subtype; const char *label; bool hasApp; };
+struct esp_partition_t { int type; int subtype; const char *label; bool hasApp; unsigned size = 0; };
 struct esp_app_desc_t { int magic; };
 static std::vector<esp_partition_t> g_table; static int g_running = 0;
 static const esp_partition_t *esp_ota_get_running_partition() { return &g_table[g_running]; }
@@ -86,6 +90,10 @@ static void run(const char *name, std::vector<esp_partition_t> t, int running) {
   g_table = t; g_running = running;
   printf("%s app=%d sb=%d path=%s\n", name, (int)hasSpareAppOtaSlot(), (int)hasSafeboot(), firmwareOtaPath());
 }
+static void runL(const char *name, std::vector<esp_partition_t> t, int running) {
+  g_table = t; g_running = running;
+  printf("%s layout=%s expected=%s\n", name, partitionLayout(), partitionLayoutExpected());
+}
 int main() {
   const esp_partition_t SB  = {0, ESP_PARTITION_SUBTYPE_APP_FACTORY, "safeboot", true};
   const esp_partition_t SBE = {0, ESP_PARTITION_SUBTYPE_APP_FACTORY, "safeboot", false};
@@ -95,6 +103,15 @@ int main() {
   run("old_layout", {A0}, 0);                  // pre-alpha.425 table: app0 only
   run("empty_factory", {SBE, A0}, 1);          // factory partition without an app image
   run("dual_slot", {A0, A1}, 0);               // a table with a spare OTA slot
+  // ADR-298: the table is told by the size of app0, not by the partition names
+  const esp_partition_t A0old = {0, ESP_PARTITION_SUBTYPE_APP_OTA_0, "app0", true, 0x230000};
+  const esp_partition_t A0new = {0, ESP_PARTITION_SUBTYPE_APP_OTA_0, "app0", true, 0x240000};
+  const esp_partition_t A0odd = {0, ESP_PARTITION_SUBTYPE_APP_OTA_0, "app0", true, 0x250000};
+  runL("layout_old_safeboot", {SB, A0old}, 1);
+  runL("layout_new_safeboot", {SB, A0new}, 1);
+  runL("layout_odd", {SB, A0odd}, 1);
+  runL("layout_legacy", {A0old}, 0);
+  runL("layout_empty_factory", {SBE, A0new}, 1);
   return 0;
 }
 """
@@ -111,7 +128,10 @@ class FirmwareOtaPath(unittest.TestCase):
             return
         with tempfile.TemporaryDirectory() as d:
             cpp = Path(d) / "t.cpp"
-            cpp.write_text(PRELUDE + "".join(bodies[n] for n in FUNCS) + MAIN, encoding="utf-8")
+            # the macro and the marker array partitionLayoutExpected() reads, taken from the header
+            decl = "\n".join(re.findall(r"^(?:#define OTGW_PARTITION_LAYOUT .*|static const char kPartitionLayoutMarker.*)$",
+                                         text, re.M)) + "\n"
+            cpp.write_text(PRELUDE + decl + "".join(bodies[n] for n in FUNCS) + MAIN, encoding="utf-8")
             exe = compile_cpp(cpp, Path(d) / ("t.exe" if os.name == "nt" else "t"))
             if exe is None:
                 raise unittest.SkipTest("no C++ compiler")
@@ -134,6 +154,57 @@ class FirmwareOtaPath(unittest.TestCase):
 
     def test_dual_slot(self):
         self.assertEqual(self.rows.get("dual_slot"), {"app": "1", "sb": "0", "path": "direct"})
+
+    def test_the_layout_is_told_by_the_app0_size_not_by_the_names(self):
+        self.assertEqual(self.rows.get("layout_old_safeboot", {}).get("layout"), "safeboot")
+        self.assertEqual(self.rows.get("layout_new_safeboot", {}).get("layout"), "safeboot2")
+        self.assertEqual(self.rows.get("layout_odd", {}).get("layout"), "unknown")
+        self.assertEqual(self.rows.get("layout_legacy", {}).get("layout"), "legacy")
+        self.assertEqual(self.rows.get("layout_empty_factory", {}).get("layout"), "legacy")
+
+    def test_device_info_emits_the_layout_and_the_expected_one(self):
+        rest = REST.read_text(encoding="utf-8")
+        self.assertRegex(rest, r'je\.field\(F\("partition_layout"\),\s*partitionLayout\(\)\)')
+        self.assertRegex(rest, r'je\.field\(F\("partition_layout_expected"\),\s*partitionLayoutExpected\(\)\)')
+
+    def test_the_expected_layout_matches_the_partition_csv(self):
+        csv = (HERE.parent / "partitions_otgw_esp32.csv").read_text(encoding="utf-8")
+        row = [l for l in csv.splitlines() if l.startswith("app0")][0]
+        size = int(row.split(",")[4].strip(), 16)
+        name = {0x230000: "safeboot", 0x240000: "safeboot2"}[size]
+        self.assertEqual(self.rows["layout_old_safeboot"]["expected"], name,
+                         "partitionLayoutExpected() is not the table partitions_otgw_esp32.csv describes")
+
+    def test_a_filesystem_image_smaller_than_the_partition_is_refused_before_any_write(self):
+        text = HDR.read_text(encoding="utf-8")
+        m = re.search(r"\} else if \(uploadTotal < fsSize\) \{(.*?)\}\n      if \(fsRefusal\)", text, re.S)
+        self.assertIsNotNone(m, "no refusal of an image that is smaller than the partition (another table's image)")
+        self.assertIn("fsRefusal = ", m.group(1))
+        # the refusal is decided before anything is copied, snapshotted or unmounted (bench .76: LittleFS stayed unmounted otherwise)
+        self.assertLess(text.index("fsRefusal = \"filesystem image does not match"), text.index("_keepFiles();   // TASK-1266"))
+
+    def test_a_filesystem_upload_without_size_is_refused_before_any_write(self):
+        text = HDR.read_text(encoding="utf-8")
+        m = re.search(r"if \(uploadTotal == 0\) \{(.*?)\} else if \(uploadTotal > fsSize\)", text, re.S)
+        self.assertIsNotNone(m, "an upload without size= can be written unchecked (ADR-298 review F2)")
+        self.assertIn("size=", m.group(1))
+        self.assertIn("fsRefusal = ", m.group(1))
+        self.assertLess(text.index("fsRefusal = \"filesystem upload needs size="), text.index("_keepFiles();   // TASK-1266"))
+
+    def test_the_app_image_carries_the_layout_it_is_built_for(self):
+        text = HDR.read_text(encoding="utf-8")
+        self.assertRegex(text, r'static const char kPartitionLayoutMarker\[\] __attribute__\(\(used\)\) = "otgw-layout=" OTGW_PARTITION_LAYOUT;')
+        # the page and ota_flash.py read it from the image; the expected layout is derived from the marker so it stays linked
+        self.assertIn("kPartitionLayoutMarker + (sizeof(\"otgw-layout=\") - 1)", text)
+
+    def test_the_first_boot_on_another_table_says_so(self):
+        ino = (SRC / "OTGW-firmware.ino").read_text(encoding="utf-8")
+        self.assertRegex(ino, r"strcmp\(partitionLayout\(\), partitionLayoutExpected\(\)\) != 0\)\s*SetupDebugf")
+
+    def test_the_update_page_blocks_the_one_action_update_on_a_layout_mismatch(self):
+        page = (SRC / "webui" / "update.html").read_text(encoding="utf-8")
+        self.assertIn("d.partition_layout_expected", page)
+        self.assertRegex(page, r"s\.layout !== s\.layoutWant\) \{\s*blockOne\(")
 
     def test_device_info_emits_the_path(self):
         rest = REST.read_text(encoding="utf-8")

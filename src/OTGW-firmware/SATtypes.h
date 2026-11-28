@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.474
+**  Version  : v2.0.0-beta.496
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -150,6 +150,7 @@ struct SatDiagIn {
   uint32_t now;          // the tick time
   uint32_t intervalMs;   // the control tick interval
   bool chAsked;          // CH=1 goes out this tick
+  bool bandOff;          // the tolerance band holds CH off (a band pause; not a PWM OFF phase), Q-428a / entry 501
   bool flame;            // flame on
   bool flowAboveCs;      // the boiler flow is at or above the CS of this tick
   bool atMax;            // the requested setpoint is clamped to the maximum, or PWM runs at its maximum duty
@@ -246,9 +247,6 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bSlaveCfgValid        = false;  // a valid MsgID 3 reply from the boiler was seen since the restart
   bool     bSlaveLowOffDenied    = false;  // HB bit 4 of the last valid reply
   uint32_t iSlaveCfgChangeMs     = 0;      // millis() when bSlaveCfgValid or bSlaveLowOffDenied last changed
-  uint8_t  iPwmVetoReason        = 0;      // why PWM was last refused: 0 none, 1 no valid reply yet (2 = bit 4 = 1, no longer set since entry 392)
-  uint8_t  iPwmVetoPath          = 0;      // which path asked: 0 other, 1 overshoot switch, 2 restart restore, 3 control_mode command, 4 PWM left while running, 5 end-of-cycle switch
-  uint32_t iPwmVetoMs            = 0;      // millis() of the last refusal
   // Modulation control
   uint8_t iCurrentModulation     = 100;   // Last MM= value sent to boiler (0-100)
   // DHW state
@@ -562,8 +560,7 @@ struct SATSection {
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
   int16_t  iPreSatMaxTSet     = 0;      // TASK-1541: boiler MsgID 57 value before SAT's first SH=, kept until SAT's switch-off restores it (0 = nothing pending); not a user setting
   int16_t  iPreSatDhwSet      = 0;      // TASK-1541: same for MsgID 56 / SW=
-  float    fOvershootMargin   = 2.0f;   // Overshoot margin °C for the cycle classification (entry 37; TASK-1268 lowered it from Python's 3.0); not the PWM switch since TASK-1888
-  float    fPwmSwitchMargin   = 2.0f;   // TASK-2005, entry 407 + Q-407a (Robert): continuous->PWM when flow - requested >= this for 60 s (was 1.5 C / 30 s, TASK-1888)
+  float    fPwmSwitchMargin   = 3.0f;   // TASK-3151.3, Robert 2026-11-28 + ADR-306: continuous->PWM when flow - requested >= this for 60 s, and the end-of-cycle OVERSHOOT verdict; thermo-nova's 3.0 (cycles/const.py:10)
   float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)
   float    fDhwSetpoint       = 0.0f;   // DHW setpoint (0=inactive, 30-60°C)

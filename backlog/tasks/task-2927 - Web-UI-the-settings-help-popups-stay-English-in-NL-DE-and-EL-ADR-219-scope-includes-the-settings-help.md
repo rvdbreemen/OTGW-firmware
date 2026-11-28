@@ -3,10 +3,11 @@ id: TASK-2927
 title: >-
   Web UI: the settings help popups stay English in NL, DE and EL (ADR-219 scope
   includes the settings help)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-19T19:38:00Z'
-updated_date: '2026-11-27T08:02:00Z'
+updated_date: '2026-11-27T22:39:00Z'
 labels:
   - webui
   - i18n
@@ -29,6 +30,12 @@ Found in the read-only UI walk of 397 (7e31bc2) on .61, 2026-11-19, German UI at
 - [ ] #3 LittleFS/pack size impact measured and recorded
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1) v2.js helpFor(): the pack key settings.help.<key> wins, the English text of settingsHelp.h is the per-key fallback (done, local). 2) Packs nl/de/el: settings.help.<key> for the English help keys via translator agents plus two adversarial reviews (done, local). 3) Completeness test for the help keys (done: settings-help-pack-keys-2927). 4) Measure pack size and LittleFS space at the next real build of this lane (AC3). Stacked on TASK-3118 (corrected English).
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -43,4 +50,8 @@ Maintainer decision (Robert, 2026-11-19 19:54 UTC, Discord DM 157306383971555753
 2026-11-27 Related: TASK-3118 (two English help defects, sathpcycle/satcyclesperhour and ethdns).
 
 2026-11-27 Owner of i18n/glossary.md: otgw-webui (he runs the translate skill and the packs), decided by the coordinator. The conflict ruimtesensor (glossary item 50) versus kamersensor (nl pack labels and help texts) is his decision; if the glossary wins, the labels and the four satsensorarea help texts change.
+
+2026-11-27 (otgw-webui, 2.1.0 prep, local lane ba-2927, stacked on ba-3118): code half: helpFor() shows the pack text settings.help.<key> when the active pack has it, English per key otherwise; tests/webui/settings-help-translated-2927.test.mjs 4 (2 red on the old v2.js). Translations: 166 help texts x nl/de/el (169 keys per pack), three translator agents then two adversarial reviews (86 findings; 52 must/should applied, 7 already covered by the first replacement, nits not applied); judgement calls: ethdns says router address (Ethernet.ino:70), nl keeps kamersensor like the pack labels (glossary #50 says ruimtesensor: conflict left to the glossary owner). Tests: settings-help-pack-keys-2927 (6) completeness gate; i18n-lang and lang-menu relaxed for settings.help.* (English lives in settingsHelp.h); settings-help 29, i18n-followups 4, i18n-lang 6, i18n-no-hardcoded 3, lang-menu 7 green; evaluate --quick 0 failed. Size (gzip): nl 27067 to 33554 B, de 27826 to 34459 B, el 32897 to 41194 B (+6.5, +6.6, +8.3 KB); LittleFS free space NOT measured (needs a build). The three PWM-cycle/ethdns packs texts follow the corrected English of TASK-3118. NOT done: browser check of a translated popover, native reviewer. Task file repaired: an earlier rebase of mine left three duplicate updated_date lines in this file (commits 4109aed94, a103c84e5, 9942dbb92); this commit restores dev's valid file plus this note.
+
+2026-11-28 otgw-webui: the six English helps that changed on dev after the first translation (gpiosensorspin, s0counterpin, ledblink, otdopenbypass, otdautobypass, satzonecount) were translated for nl/de/el and then reviewed by two adversarial reviewers (A native tone and heating terms, B clarity/numbers/length). Findings applied: s0counterpin gets the OTGW32 DI terminal and 'on other boards'; the bypass sentence says thermostat bypass relay as a thing, not 'of the thermostat'; satzonecount nl 'tot en met 4', el 'except the main room'; gpiosensorspin de 'Standardpins'; ledblink de/el wording. Both reviewers found no other defect; nits not applied (nl 'Statusled' spelling, nl ledblink word order, 'warmtevraag'). Tests one file at a time: settings-help-pack-keys-2927 6/6, settings-help-translated-2927 4/4, settings-help 29/29, i18n-lang 6/6, i18n-no-hardcoded 3/3, lang-menu 7/7. Not a native-speaker review: 'DI-contact/Klemmleiste/κλέμα' wording is the reviewers' and my choice.
 <!-- SECTION:NOTES:END -->

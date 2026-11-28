@@ -95,7 +95,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("control_interval: %u\r\n"), (unsigned)settings.sat.iControlInterval);
     Debugf(PSTR("use_external_temp: %s\r\n"), settings.sat.bUseExternalTemp ? "true" : "false");
     Debugf(PSTR("max_rel_mod: %u\r\n"), (unsigned)settings.sat.iMaxRelModulation);
-    Debugf(PSTR("overshoot_margin: %.1f\r\n"), settings.sat.fOvershootMargin);
     Debugf(PSTR("pwm_switch_margin: %.1f\r\n"), settings.sat.fPwmSwitchMargin);   // TASK-1888
     Debugf(PSTR("dhw_setpoint: %.1f\r\n"), settings.sat.fDhwSetpoint);
     Debugf(PSTR("dhw_enabled: %s\r\n"), settings.sat.bDhwEnabled ? "true" : "false");
@@ -601,6 +600,10 @@ void handleDebugChar(char c){
             case 'K':   // TASK-3025 bench hook: deep heap hold, free under 3072 so emergencyHeapRecovery() runs (2 min, K again releases)
                 s_heapHoldReq = 2;
                 DebugTln(F("heaphold DEEP: request queued (K or H again releases, 2 min releases by itself)"));
+                break;
+            case 'T':   // TASK-3119 follow-up: print the 1 Hz lwIP / heap ring (the loop task prints it at its next tick)
+                tcpRingRequestDump();
+                DebugTln(F("tcpring: dump requested (prints within a second)"));
                 break;
             case 'B':   // TASK-2921 bench hook: REST in-flight cap 1, busy path closes without a response
                 DebugTf(PSTR("REST starved-heap simulation: %s (B toggles, off at boot)\r\n"),

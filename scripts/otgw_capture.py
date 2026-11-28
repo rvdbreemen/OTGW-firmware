@@ -3005,9 +3005,9 @@ GRAPH_TEMP_COLUMNS = ("flow", "ret", "chSet", "roomSet", "room", "outside")
 GRAPH_JSON_COLUMNS = GRAPH_TEMP_COLUMNS + ("mod", "flame", "dhw_on", "ch")   # what /api/v2/graph/history sends
 # The web UI CSV follows v2.js GSER, which also has the live-only DHW temperature (TASK-1776, MsgID 26): the device
 # history has no such column, so its cell is empty in every history row, as in the web UI export.
-# TASK-2018 (ADR-256): satTarget is sent only when the window holds a SAT target; the web UI CSV has it after roomSet.
-GRAPH_OPTIONAL_TEMP_COLUMNS = ("satTarget",)
-GRAPH_CSV_COLUMNS = ("flow", "ret", "chSet", "roomSet", "satTarget", "room", "outside", "dhw", "mod", "flame", "dhw_on", "ch")
+# TASK-2018 (ADR-256), TASK-3007 (ADR-291): satTarget and satRoom are sent only when the window holds a SAT value; the web UI CSV has them after roomSet.
+GRAPH_OPTIONAL_TEMP_COLUMNS = ("satTarget", "satRoom")
+GRAPH_CSV_COLUMNS = ("flow", "ret", "chSet", "roomSet", "satTarget", "satRoom", "room", "outside", "dhw", "mod", "flame", "dhw_on", "ch")
 GRAPH_GSLOT_MS = 5000
 GRAPH_HISTORY_BODY_CAP = 2 * 1024 * 1024
 GRAPH_HISTORY_SECONDS = 3600   # long run: one fetch per hour besides start and stop

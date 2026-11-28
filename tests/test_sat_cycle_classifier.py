@@ -4,7 +4,8 @@
 Sergeant D entry 55 (docs/sat/decisions/sergeant-d-corrections.md, Q4 answer A): the firmware classifier must match
 thermo-nova cycles/classifier.py (pin 7beaaf5) exactly, with these firmware deviations from the plan:
   - cold setpoint 28.2 (radiators, entry 11) through satGetColdSetpoint(), not COLD_SETPOINT 22;
-  - overshoot margin settings.sat.fOvershootMargin = 2.0 (entry 15), not OVERSHOOT_MARGIN_CELSIUS 3.0;
+  - overshoot margin settings.sat.fPwmSwitchMargin, default 3.0 = OVERSHOOT_MARGIN_CELSIUS (TASK-3151.3, ADR-306: one margin,
+    a user setting; the 2.0 of entry 15 and its own setting are gone);
   - PWM underheat is labelled SAT_CYCLE_UNDERHEAT_PWM, continuous underheat SAT_CYCLE_UNDERHEAT;
   - controlSp <= 0 is the firmware stand-in for "flow_control_setpoint_error p50/p90 missing";
   - cycle kind from tracker.py:314-324, CH = master CH-enable bit (Statusflags & 0x0100) and not DHW,
@@ -111,7 +112,6 @@ static OTSys OTcurrentSystemState;
 static uint32_t g_ms = 1000000UL; static float g_flow = 50.0f; static float g_cold = 28.2f;
 static uint32_t g_onTimeMs = 0; static bool g_idle = false;
 static float _sat_requestedSetpoint = 0.0f;
-static bool satStartGateActive() { return false; }   // TASK-1942 (entries 385/387): no start gate here; tests/test_sat_pwm_first_start.py runs the real one
 static const float SAT_MIN_SETPOINT = 10.0f;   // SATcontrol.ino:129
 static uint32_t millis() { return g_ms; }
 static float satGetFlowTemp() { return g_flow; }
@@ -124,8 +124,7 @@ static void sendWebSocketJSON(const char*) {}
 #define satNarratef_P(...) ((void)0)
 #define satNarrate_P(x) ((void)0)
 // TASK-1331: the end-of-cycle switch (satCycleApplyEndOfCycle) reaches the PWM entry gate and the mode setter.
-static bool g_permit = true; static int g_switches = 0;
-static bool satPwmEntryAllowed(uint8_t) { return g_permit; }
+static int g_switches = 0;
 static void satSetControlMode(SATControlMode m) { if (m != state.sat.eControlMode) g_switches++; state.sat.eControlMode = m; }
 #define snprintf_P snprintf
 static size_t strlcpy_P(char* d, const char* s, size_t n) { snprintf(d, n, "%s", s); return strlen(s); }
@@ -139,7 +138,7 @@ static void _dailyRecord(uint32_t, uint32_t, uint32_t, SATCycleClass, float) { g
 """
 
 SETTINGS_REAL = "struct Settings { SATSection sat; };\nstatic Settings settings;\n"
-SETTINGS_STUB = ("struct SatSettingsStub { float fOvershootMargin = 2.0f; float fPwmSwitchMargin = 1.5f; bool bPwmAutoSwitch = true; bool bSimulation = false; };\n"
+SETTINGS_STUB = ("struct SatSettingsStub { float fPwmSwitchMargin = 3.0f; bool bPwmAutoSwitch = true; bool bSimulation = false; };\n"
                  "struct Settings { SatSettingsStub sat; };\nstatic Settings settings;\n")
 
 MAIN = r"""
@@ -165,7 +164,7 @@ static void report(int n) {
          n, (int)state.sat.i4hCycles);
 }
 static int twoCycle() {
-  settings.sat.fOvershootMargin = 2.0f;
+  settings.sat.fPwmSwitchMargin = 3.0f;
   state.sat.fFinalSetpoint = 50.0f; _sat_requestedSetpoint = 50.0f; state.sat.fPidOutput = 50.0f;
   printf("init_ema_alpha=%.9g init_duty=%.9g\n", (double)EMA_ALPHA, (double)state.sat.fDutyRatio);
   for (int n = 1; n <= 2; n++) {
@@ -190,7 +189,7 @@ static void snap(const char* tag) {
          (double)state.sat.fUnderheatFraction, (double)state.sat.fDutyRatio, (int)state.sat.i4hCycles, (double)state.sat.f4hAvgOnSec);
 }
 static int flicker() {
-  settings.sat.fOvershootMargin = 2.0f;
+  settings.sat.fPwmSwitchMargin = 3.0f;
   state.sat.fFinalSetpoint = 50.0f; _sat_requestedSetpoint = 50.0f; state.sat.fPidOutput = 50.0f;
   apply(50.0f, CHFLAGS, 1, 0); satCycleOnFlameChange(true);
   for (int k = 0; k < 300; k++) { g_ms += 1000; apply(50.0f, CHFLAGS, 1, 0); satCycleSample(); }
@@ -209,8 +208,7 @@ int main(int argc, char** argv) {
   if (argc > 1 && strcmp(argv[1], "twocycle") == 0) return twoCycle();
   if (argc > 1 && strcmp(argv[1], "flicker") == 0) return flicker();
   if (argc < 6) return 2;
-  settings.sat.fOvershootMargin = 2.0f;
-  if (getenv("OTGW_TEST_PWM_DENIED")) g_permit = false;       // TASK-1331: the boiler refuses low-off (MsgID 3 HB bit 4 = 1)
+  settings.sat.fPwmSwitchMargin = 3.0f;
   const float ctrlSp = (float)atof(argv[1]), reqSp = (float)atof(argv[2]);
   g_onTimeMs = (uint32_t)(atof(argv[3]) * 1000.0 + 0.5);
   g_idle = atoi(argv[4]) != 0;
@@ -371,7 +369,7 @@ CASES = {
     # C2 cls:74-78 continuous control error p90 >= margin -> OVERSHOOT
     "C2": Case([seg(300, 54.0)], "OVERSHOOT"),
     # C2 boundary: p90 error exactly 2.0 >= 2.0 and no overshoot-seconds gate (HEAD counts only flow > 52)
-    "C2_boundary": Case([seg(300, 52.0)], "OVERSHOOT"),
+    "C2_boundary": Case([seg(300, 53.0)], "OVERSHOOT"),
     # C2order (a): OVERSHOOT before any duration rule: 40 s continuous overshooting cycle -> OVERSHOOT
     "C2order_short": Case([seg(40, 54.0)], "OVERSHOOT"),
     # C2order (b): OVERSHOOT before UNDERHEAT: tail p90 53 (err +3), p50 45 (err -5) -> OVERSHOOT
@@ -447,9 +445,9 @@ CASES = {
                                                      "UNDERHEAT_PWM", on_time=300, oracle=False),
     # TASK-1586 (entry 248, Q-PARITY-1 A): the tail percentiles interpolate between the two neighbouring sorted values
     # (helpers.py:185-202). Burn 239 s, so the 180-sample ring is exactly the tail (warm-up 59.75 s: t = 60..239).
-    # IP1: tail errors +1.5 x162, +8 x18 (control 50): p90 position 161.1 -> 1.5 + 6.5 * 0.1 = 2.15 >= margin 2.0 -> OVERSHOOT
-    # (the lower neighbour gave 1.5 -> GOOD).
-    "IP1_p90_between_neighbours_overshoot": Case([seg(221, 51.5), seg(18, 58.0)], "OVERSHOOT"),
+    # IP1: tail errors +2.5 x162, +8 x18 (control 50): p90 position 161.1 -> 2.5 + 5.5 * 0.1 = 3.05 >= margin 3.0 -> OVERSHOOT
+    # (the lower neighbour gave 2.5 -> GOOD). TASK-3151.3: the margin is 3.0, the errors were +1.5 / 2.15 against 2.0 before.
+    "IP1_p90_between_neighbours_overshoot": Case([seg(221, 52.5), seg(18, 58.0)], "OVERSHOOT"),
     # IP2: tail errors -5 x90 (t = 60..149), 0 x90: p50 position 89.5 -> -2.5 > -3 -> GOOD (the lower neighbour gave -5 -> UNDERHEAT).
     "IP2_p50_between_neighbours_good": Case([seg(149, 45.0), seg(90, 50.0)], "GOOD"),
     "kind_mixed": Case([seg(45, 50.0, DHW), seg(45, 50.0, CH), seg(210, 50.0, NONE)], None, kind="MIXED", oracle=False),
@@ -484,17 +482,14 @@ class CycleClassifier(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def run_case(self, name, deny=False, cases=None):
+    def run_case(self, name, cases=None):
         if self.exe is None:
             self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
         c = (cases or CASES)[name]
         args = [str(self.exe), repr(c.ctrl), repr(c.req), repr(float(c.on_time)), "1" if c.idle else "0", "1" if c.sim else "0"]
         args += [("%d:%r:0x%X:%d:%d" % s[:5]) + ("" if len(s) < 6 else ":%r" % s[5]) + ("" if len(s) < 7 else ":%r" % s[6])
                  for s in c.segs]
-        env = dict(os.environ)
-        if deny:
-            env["OTGW_TEST_PWM_DENIED"] = "1"
-        r = subprocess.run(args, capture_output=True, text=True, timeout=20, env=env)
+        r = subprocess.run(args, capture_output=True, text=True, timeout=20)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr[-300:])
         m = re.match(r"cls=(\d+) kind=(\d+) count=(\d+)(?: mode=(\d+) switches=(\d+))?", r.stdout)
         self.assertTrue(m, r.stdout)
@@ -591,7 +586,7 @@ class CycleClassifier(unittest.TestCase):
     def test_C2_continuous_overshoot(self):
         with self.subTest("flow 54"):
             self.check("C2")
-        with self.subTest("p90 error exactly at the 2.0 margin, no overshoot-seconds gate"):
+        with self.subTest("p90 error exactly at the 3.0 margin, no overshoot-seconds gate"):
             self.check("C2_boundary")
 
     def test_C2order_overshoot_before_duration_and_underheat(self):
@@ -686,8 +681,8 @@ class CycleClassifier(unittest.TestCase):
             self.assertAlmostEqual(float(v["c2_4h_duty"]), 600.0 / 14400.0, places=5, msg="4h duty = flame-on seconds / 4 h (entry 268)")
 
     # --- TASK-1331: the verdict switches PWM on or off at flame off (thermo-nova pwm.py:219-227, entries 15, 18, 36, 37) ---
-    def end_of_cycle(self, name, expect_mode, expect_switches, deny=False):
-        self.run_case(name, deny=deny, cases=END_CASES)
+    def end_of_cycle(self, name, expect_mode, expect_switches):
+        self.run_case(name, cases=END_CASES)
         self.assertEqual((self.last_mode, self.last_switches), (expect_mode, expect_switches),
                          "%s: mode/switches after the cycle (0 off, 1 continuous, 2 PWM)" % name)
 
@@ -721,11 +716,14 @@ class CycleClassifier(unittest.TestCase):
         self.end_of_cycle("E5_continuous_underheat", CONT, 0)
         self.end_of_cycle("E6_continuous_uncertain", CONT, 0)
 
-    def test_task1331_pwm_gate_refusal_keeps_continuous(self):
-        # MsgID 3 HB bit 4 = 1 (or no valid reply): satPwmEntryAllowed(5) says no, the OVERSHOOT verdict changes nothing
-        self.end_of_cycle("E1_continuous_overshoot", CONT, 0, deny=True)
-        # the gate guards the entry only: a PWM UNDERHEAT_PWM cycle still leaves PWM
-        self.end_of_cycle("E3_pwm_underheat", CONT, 1, deny=True)
+    def test_task3151_the_overshoot_verdict_has_no_msgid3_gate(self):
+        # ADR-305 decision 8 (Robert 2026-11-28): the MsgID 3 veto (satPwmEntryAllowed) is gone, as in thermo-nova. The verdict
+        # switches to PWM whatever the boiler says about low-off, and the cut-out block no longer asks for a permission: a
+        # reintroduced call fails here and, because the stub is gone, at the host compile of every case above.
+        code = [l for l in CYCLES_INO.read_text(encoding="utf-8").splitlines() if not l.lstrip().startswith("//")]
+        self.assertFalse([l for l in code if "satPwmEntryAllowed" in l], "a MsgID 3 permission is asked again")
+        self.end_of_cycle("E1_continuous_overshoot", PWM, 1)
+        self.end_of_cycle("E3_pwm_underheat", CONT, 1)
 
     def test_task1331_mode_off_is_left_alone(self):
         self.end_of_cycle("E7_mode_off_overshoot", 0, 0)

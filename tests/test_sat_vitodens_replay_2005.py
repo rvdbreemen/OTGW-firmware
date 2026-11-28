@@ -11,7 +11,7 @@ flow - pid >= 1.5:
   segment 3, continuous 16:37:28 .. switch 16:39:28 (16:38:58 +2.02, 16:39:28 +2.82)
 
 Each segment below is the recorded (pid, flow) per tick from its first continuous tick up to and including the tick on
-which beta.350 switched. Entry 407 (Sergeant D) and Q-407a (Robert: 2.0 default) give 2.0 C for 60 s: none of the three
+which beta.350 switched. The default is now 3.0 C for 60 s (ADR-305/306 as thermo-nova; entry 407 and Q-407a had 2.0): none of the three
 segments reaches the switch by that tick. After that tick the capture shows PWM behaviour, so the replay stops there.
 
 The code under test is the real SATcycles.ino (cut by test_sat_overshoot_sustain.extract); the switch margin is the real
@@ -56,9 +56,9 @@ class VitodensReplay(unittest.TestCase):
     def setUpClass(cls):
         src = base.CYCLES_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
         stubs = base.STUBS
-        old = "float fPwmSwitchMargin = 2.0f;"
-        assert stubs.count(old) == 1, "test_sat_overshoot_sustain stub changed, patch target not found"
-        stubs = stubs.replace(old, "float fPwmSwitchMargin = %sf;" % default_margin())
+        # the harness stub carries a margin literal; the replay uses the real default of SATtypes.h whatever the stub says (ADR-305: 3.0)
+        stubs, n = re.subn(r"float fPwmSwitchMargin = [0-9.]+f;", "float fPwmSwitchMargin = %sf;" % default_margin(), stubs)
+        assert n == 1, "test_sat_overshoot_sustain stub changed, patch target not found"
         cls.dir = tempfile.TemporaryDirectory()
         d = Path(cls.dir.name)
         cpp = d / "r.cpp"

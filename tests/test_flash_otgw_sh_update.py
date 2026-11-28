@@ -8,7 +8,9 @@ layout, explicit --app/--fs win over auto-detection: TASK-1160). Without the -e 
 (0x9000) the WiFi credentials stay: AC2 by construction of the write list.
 """
 import os
+import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -27,12 +29,27 @@ echo "$*" >> "$FAKE_LOG"
 prev=""; out=""
 for a in "$@"; do out="$a"; done
 case " $* " in
-  *" read_flash "*)
-    if [ "${FAKE_LAYOUT:-safeboot}" = "safeboot" ]; then printf 'nvs\0otadata\0safeboot\0app0\0spiffs\0' > "$out";
-    else printf 'nvs\0otadata\0app0\0app1\0spiffs\0' > "$out"; fi ;;
+  *" read_flash "*) cp "$FAKE_TABLE" "$out" ;;
 esac
 exit 0
 """
+
+
+def partition_table(layout):
+    """The 0x1000 bytes the unit holds at 0x8000: 32-byte entries (magic AA 50, type, subtype, offset, size, label[16], flags).
+    'safeboot' = the ADR-191 table (app0 2240K), 'safeboot2' = app0 2304K and a 704K LittleFS, 'legacy' = the table before safeboot."""
+    def ent(label, typ, sub, off, size):
+        return b"\xaa\x50" + bytes([typ, sub]) + struct.pack("<II", off, size) + label.encode().ljust(16, b"\0") + b"\0\0\0\0"
+    if layout == "safeboot":
+        rows = [("nvs", 1, 2, 0x9000, 0x5000), ("otadata", 1, 0, 0xE000, 0x2000), ("safeboot", 0, 0, 0x10000, 0xF0000),
+                ("app0", 0, 0x10, 0x100000, 0x230000), ("spiffs", 1, 0x82, 0x330000, 0xC0000), ("coredump", 1, 3, 0x3F0000, 0x10000)]
+    elif layout == "safeboot2":
+        rows = [("nvs", 1, 2, 0x9000, 0x5000), ("otadata", 1, 0, 0xE000, 0x2000), ("safeboot", 0, 0, 0x10000, 0xF0000),
+                ("app0", 0, 0x10, 0x100000, 0x240000), ("spiffs", 1, 0x82, 0x340000, 0xB0000), ("coredump", 1, 3, 0x3F0000, 0x10000)]
+    else:
+        rows = [("nvs", 1, 2, 0x9000, 0x5000), ("otadata", 1, 0, 0xE000, 0x2000), ("app0", 0, 0x10, 0x10000, 0x1E0000),
+                ("app1", 0, 0x11, 0x1F0000, 0x1E0000), ("spiffs", 1, 0x82, 0x3D0000, 0x20000)]
+    return b"".join(ent(*r) for r in rows).ljust(0x1000, b"\xff")
 
 
 @unittest.skipUnless(BASH, "bash not found")
@@ -53,8 +70,18 @@ class FlashShUpdate(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def run_sh(self, *args, layout="safeboot"):
-        env = dict(os.environ, FAKE_LOG=self.log.as_posix(), FAKE_LAYOUT=layout, NO_COLOR="1")
+    def run_sh(self, *args, layout="safeboot", tool=None):
+        if tool:
+            # The table this package's images are built for, pinned in the temporary copy of the script as the app0 size
+            # (TOOL_APP0_SIZE). A script from before the guard has no such line: the pin then changes nothing, which is
+            # exactly the old tool handed new images (red on the old script, green on the fixed one).
+            p = self.tmp / "flash_otgw.sh"
+            t = p.read_text(encoding="utf-8")
+            size = {"safeboot": "0x230000", "safeboot2": "0x240000"}[tool]
+            p.write_text(re.sub(r'(?m)^TOOL_APP0_SIZE=".*"$', 'TOOL_APP0_SIZE="%s"' % size, t), encoding="utf-8", newline="\n")
+        table = self.tmp / ("table-%s.bin" % layout)
+        table.write_bytes(partition_table(layout))
+        env = dict(os.environ, FAKE_LOG=self.log.as_posix(), FAKE_TABLE=table.as_posix(), NO_COLOR="1")
         r = subprocess.run([BASH, (self.tmp / "flash_otgw.sh").as_posix(), "--port", "/dev/null", *args],
                            capture_output=True, text=True, env=env, cwd=str(self.tmp), timeout=60)
         calls = self.log.read_text(encoding="utf-8").splitlines() if self.log.exists() else []
@@ -104,6 +131,29 @@ class FlashShUpdate(unittest.TestCase):
         self.assertNotEqual(rc, 0, out)
         self.assertEqual(self.writes(calls), [], "written to a unit on the wrong layout: %r" % calls)
         self.assertIn("--migrate", out)
+
+    # The layout is told by the size of app0, not by the name "safeboot": the table of the +64K repartition has the
+    # same names as the old one, and a write at the new offsets onto the old table lands inside the old filesystem.
+    def test_new_images_on_a_unit_with_the_old_safeboot_table_are_refused_before_any_write(self):
+        rc, out, calls = self.run_sh("--update", "--app", self.app.as_posix(), "--fs", self.fs.as_posix(),
+                                     layout="safeboot", tool="safeboot2")
+        self.assertNotEqual(rc, 0, out)
+        self.assertEqual(self.writes(calls), [], "written to a unit on the old table: %r" % calls)
+        self.assertIn("--migrate", out)
+
+    def test_old_images_on_a_unit_with_the_new_table_are_refused_before_any_write(self):
+        rc, out, calls = self.run_sh("--update", "--app", self.app.as_posix(), layout="safeboot2", tool="safeboot")
+        self.assertNotEqual(rc, 0, out)
+        self.assertEqual(self.writes(calls), [], "written to a unit on the new table: %r" % calls)
+
+    def test_new_images_on_a_unit_with_the_new_table_are_written(self):
+        rc, out, calls = self.run_sh("--update", "--app", self.app.as_posix(), layout="safeboot2", tool="safeboot2")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(len(self.writes(calls)), 1, calls)
+
+    def test_the_unit_layout_is_named_in_the_output(self):
+        rc, out, calls = self.run_sh("--update", "--app", self.app.as_posix(), layout="safeboot2", tool="safeboot2")
+        self.assertIn("Unit layout: safeboot2", out)
 
     def test_update_without_any_image_stops(self):
         self.app.unlink(); self.fs.unlink()

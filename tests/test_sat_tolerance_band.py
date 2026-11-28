@@ -78,7 +78,6 @@ int main() {
       if (e.kind == "flame" && (e.val != 0) != g_flame) {
         g_flame = e.val != 0;
         if (g_flame) g_flameOnStart = g_ms; else g_flameOffStart = g_ms;
-        satPwmNoteDhwFlameEdge(g_flame, state.sat.bDhwActive);
       } else if (e.kind == "pid") pid = e.val;
       else if (e.kind == "flow") g_flow = e.val;   // the MsgID 25 flow the switch rules read (satGetFlowTemp())
       else if (e.kind == "pwm") { state.sat.eControlMode = SAT_MODE_PWM; _pwm_entryPending = true; _pwm_lastUpdateMs = g_ms; }
@@ -236,7 +235,7 @@ class BandLoop(unittest.TestCase):
         for sec in range(60, 631, 30):
             self.assertEqual(rows[sec]["mode"], "1", (sec, rows[sec]))
 
-    def test_margin_rule_is_skipped_during_a_band_pause_too(self):   # entry 410: flow 48 = request + 3 (margin 2, below the 3.5 fail-safe)
+    def test_margin_rule_is_skipped_during_a_band_pause_too(self):   # entry 410: flow 48 = request + 3 (the margin default, so the rule would fire if it ran)
         rows = self.run_sc([(0, "flow", 40.0), (0, "err", 0.5), (35, "err", -0.2), (65, "flow", 48.0)], dur=630)
         for sec in range(60, 631, 30):
             self.assertEqual(rows[sec]["mode"], "1", (sec, rows[sec]))
@@ -245,7 +244,8 @@ class BandLoop(unittest.TestCase):
         rows = self.run_sc(self.INDIGO_PAUSE + [(640, "err", 0.2)], dur=750)
         self.assertEqual(rows[660]["ch"], "1", rows[660])
         self.assertEqual(rows[660]["mode"], "1", rows[660])   # the start counts from the first tick with heating allowed
-        self.assertEqual(rows[690]["mode"], "2", rows[690])   # fail-safe: 30 s later
+        self.assertEqual(rows[690]["mode"], "1", rows[690])   # no 30 s fail-safe any more (TASK-3151.1)
+        self.assertEqual(rows[720]["mode"], "2", rows[720])   # the margin rule: 60 s after the first tick with heating allowed
 
     def test_a_stop_while_ch_is_already_off_starts_no_minimum(self):   # entry 403: nothing to turn off (boot, cold cutoff)
         rows = self.run_sc([(0, "err", -0.2), (65, "err", 0.2)])

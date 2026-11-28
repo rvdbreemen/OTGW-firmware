@@ -192,7 +192,9 @@ class TestKeepList(unittest.TestCase):
         """After these errors _handleUploadEnd does not run, and the error answer clears bESPactive,
         which turns the abort cleanup off: each path has to free the copies itself."""
         drop = r"\s*_dropKeptFiles\(\);"
-        self.assertTrue(re.search(r'"filesystem image too large", sizeof\(_updaterError\)\);' + drop, UPD), "image too large")
+        # a refusal that needs only the query string and the partition size is decided BEFORE the copy (ADR-298, bench .76): there is
+        # nothing to free and LittleFS stays mounted; test_fs_ota_refusal_before_unmount.py pins that order
+        self.assertLess(UPD.index('fsRefusal = "filesystem image too large"'), UPD.index("_keepFiles();"), "image too large")
         self.assertTrue(re.search(r"!Update\.begin\(fsSize, U_SPIFFS\)\) \{\s*_setUpdaterError\(\);" + drop, UPD), "Update.begin fails")
         self.assertTrue(re.search(r"if \(written != len\) \{\s*_setUpdaterError\(\);" + drop, UPD), "short write")
         self.assertTrue(re.search(r"if \(Update\.hasError\(\) \|\| _updaterError\[0\] != '\\0'\) \{\s*::state\.flash\.bESPactive = false;" + drop,

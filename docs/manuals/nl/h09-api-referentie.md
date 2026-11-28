@@ -1053,7 +1053,7 @@ Onderwerp: `{TopTopic}/set/{UniqueId}/sat/<commando>`. Commandonamen zijn niet h
 | `sat/outdoor_temp` | `"7.5"` | Externe buitentemperatuur doorgeven (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 tot 50000) | PV-overschot (W) doorgeven voor PV-boost |
 | `sat/enabled` | `"true"` / `"false"` (ook `"on"` / `"off"`, `"1"` / `"0"`) | SAT in- of uitschakelen |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (of `"1"` / `"2"` / `"0"`) / `"off"` | Bedrijfsmodus instellen. `"off"` zet SAT uit, net als `sat/enabled` 0. Elke andere niet-numerieke waarde geldt als `"auto"` |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (of `"1"` / `"2"` / `"0"`) / `"off"` | Genegeerd sinds deze versie: SAT kiest zelf tussen continu en PWM en het commando schrijft alleen een logregel (zodat Home Assistant-automatiseringen die het sturen niet breken). `"off"` zet SAT nog steeds uit, net als `sat/enabled` 0 |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Voorinstelling activeren; `"none"` wist de voorinstelling |
 | `sat/humidity` | `"58"` (0 tot 100) | Luchtvochtigheid binnen (%) doorgeven |
 | `sat/weather_lat` | `"52.3702"` (-90 tot 90) | Breedtegraad van de weerlocatie instellen; alles behalve één getal binnen het bereik wordt genegeerd. De status staat retained op `sat/weather_lat` |
@@ -1072,7 +1072,6 @@ De onderstaande commando's geven de payload ongewijzigd door aan de genoemde ins
 
 | Onderwerpsuffix | Instelling |
 |----------------|-----------|
-| `sat/overshoot_margin` | `SATovershootmargin` |
 | `sat/pwm_switch_margin` | `SATpwmswitchmargin` |
 | `sat/heating_system` | `SATsystem` |
 | `sat/manufacturer` | `SATmanufacturer` |

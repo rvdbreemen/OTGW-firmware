@@ -4321,7 +4321,7 @@ paths:
         Updates any named SAT setting. This mirrors all MQTT `sat/<name>` command
         handlers. The setting name corresponds to the MQTT subtopic (e.g.,
         `heating_curve_coeff`, `boiler_capacity`, `heating_system`,
-        `overshoot_margin`, `manufacturer`, `simulation`, etc.).
+        `pwm_switch_margin`, `manufacturer`, `simulation`, etc.).
 
         The special no-value command `reset_integral` is also accepted here
         without a body.
@@ -4558,12 +4558,9 @@ components:
         coefficient:
           type: number
           description: "Heating-curve coefficient (steepness)"
-        overshoot_margin:
-          type: number
-          description: "Allowed overshoot above target before a cycle is classed as overshoot (C)"
         pwm_switch_margin:
           type: number
-          description: "Continuous to PWM when flow minus the requested setpoint stays at or above this for 60 s (C, 0.5-5.0, default 2.0; TASK-1888, TASK-2005). A stored old default of 1.5 becomes 2.0 once"
+          description: "The one overshoot margin (C, 0.5-5.0, default 3.0): continuous to PWM when flow minus the requested setpoint stays at or above this for 60 s, and the margin of the cycle class OVERSHOOT. A stored old default of 1.5 or 2.0 becomes 3.0 once"
         cycle_count:
           type: integer
           description: "Total boiler cycles counted"
@@ -5011,8 +5008,7 @@ components:
         kd: 0.0
         raw_derivative: 0.0
         coefficient: 1.5
-        overshoot_margin: 2.0
-        pwm_switch_margin: 2.0
+        pwm_switch_margin: 3.0
         cycle_count: 0
         cycles_this_hour: 0
         last_cycle_class: 0

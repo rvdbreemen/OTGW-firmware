@@ -49,7 +49,8 @@ test('el is a supported language and i18n/el.json has exactly the English key se
   const langs = /var I18N_LANGS = \[([^\]]*)\]/.exec(src)[1].replace(/['"\s]/g, '').split(',');
   assert.deepEqual(langs, ['en', 'nl', 'de', 'el']);
   const pack = flatten(JSON.parse(fs.readFileSync(path.join(ROOT, 'i18n', 'el.json'), 'utf8')), '', {});
-  assert.deepEqual(Object.keys(pack).sort(), EN_KEYS.slice().sort());
+  // TASK-2927: settings.help.<key> texts translate settingsHelp.h (English is in the firmware); settings-help-pack-keys-2927 checks them
+  assert.deepEqual(Object.keys(pack).filter((k) => !k.startsWith('settings.help.') || EN_KEYS.includes(k)).sort(), EN_KEYS.slice().sort());
   assert.equal(pack['nav.settings'], 'Ρυθμίσεις');
 });
 

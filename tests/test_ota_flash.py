@@ -50,6 +50,7 @@ class FakeDevice(http.server.BaseHTTPRequestHandler):
     # device/info flag (None = the field is absent, as on firmware before TASK-1495).
     page = "whole"
     fs_incomplete = None
+    dev_extra = {}   # ADR-298: extra device/info fields (partition_layout, LittleFSsize ...)
     events = []  # TASK-1372: order of the OTA steps the device saw
     # TASK-1640: --webui. Pages the device received through /upload (file name -> bytes);
     # tamper makes it serve something else than it stored.
@@ -78,6 +79,7 @@ class FakeDevice(http.server.BaseHTTPRequestHandler):
             dev = {"fwversion": "2.0.0-alpha.542"}
             if type(self).fs_incomplete is not None:
                 dev["fsupdateincomplete"] = type(self).fs_incomplete
+            dev.update(type(self).dev_extra)
             self._send(json.dumps({"device": dev}))
         elif self.path == "/" and not type(self).uploads:
             mode = type(self).page
@@ -145,6 +147,7 @@ class OtaFlashDroppedResponse(unittest.TestCase):
         FakeDevice.fs_hash = OLD_HASH
         FakeDevice.page = "whole"
         FakeDevice.fs_incomplete = None
+        FakeDevice.dev_extra = {}
         FakeDevice.events = []
         FakeDevice.uploads = {}
         FakeDevice.tamper = False
@@ -164,6 +167,78 @@ class OtaFlashDroppedResponse(unittest.TestCase):
         self.srv.shutdown()
         self.srv.server_close()
         self.tmp.cleanup()
+
+    def set_fs_size(self, n):
+        with open(self.fs, "wb") as f:
+            f.write(b"\xff" * n)
+
+    # ADR-298: the unit's partition table decides whether a filesystem image may go over WiFi.
+    def test_a_unit_on_another_table_than_the_firmware_expects_is_refused_before_any_write(self):
+        FakeDevice.dev_extra = {"partition_layout": "safeboot", "partition_layout_expected": "safeboot2"}
+        self.set_fs_size(0xB0000)
+        with self.assertRaises(SystemExit) as cm:
+            self.run_main()
+        self.assertIn("--migrate", str(cm.exception.code))
+        self.assertEqual(FakeDevice.events, [], "something was sent to the unit")
+
+    def test_an_image_of_another_size_than_the_partition_of_the_unit_is_refused(self):
+        FakeDevice.dev_extra = {"partition_layout": "safeboot", "partition_layout_expected": "safeboot"}
+        self.set_fs_size(0xB0000)
+        with self.assertRaises(SystemExit):
+            self.run_main()
+        self.assertEqual(FakeDevice.events, [])
+
+    def test_an_old_firmware_without_the_layout_fields_is_checked_by_its_filesystem_size(self):
+        FakeDevice.dev_extra = {"LittleFSsize": 0.75}   # 768K
+        self.set_fs_size(0xB0000)                       # the image of the 704K table
+        with self.assertRaises(SystemExit) as cm:
+            self.run_main()
+        self.assertIn("another partition table", str(cm.exception.code))
+        self.assertEqual(FakeDevice.events, [])
+
+    def test_a_matching_image_goes_through(self):
+        FakeDevice.dev_extra = {"partition_layout": "safeboot2", "partition_layout_expected": "safeboot2"}
+        self.set_fs_size(0xB0000)
+        rc, out = self.run_main()
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(FakeDevice.events, ["fs"])
+
+    def test_a_firmware_that_reports_nothing_about_its_table_is_not_blocked(self):
+        rc, out = self.run_main()   # the 4 KB image of the other tests, no layout fields, no LittleFSsize
+        self.assertEqual(rc, 0, out)
+
+    def set_app(self, marker):
+        self.app = os.path.join(self.tmp.name, f"OTGW-firmware-esp32-combo-2.0.0-alpha.542+{NEW_HASH}.ino.bin")
+        with open(self.app, "wb") as f:
+            f.write(b"\xe9" + b"OTGW-firmware " + (marker or b"") + b"\x00" * 64)
+
+    def run_with_app(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.mod.main(["--host", self.host, "--app", self.app, "--no-fs"])
+        return out.getvalue()
+
+    # ADR-298 review F1: the image being sent says which table it is built for.
+    def test_an_app_image_for_another_table_than_the_unit_has_is_refused(self):
+        FakeDevice.dev_extra = {"partition_layout": "safeboot", "partition_layout_expected": "safeboot"}
+        self.set_app(b"otgw-layout=safeboot2")
+        with self.assertRaises(SystemExit) as cm:
+            self.run_with_app()
+        self.assertIn("built for the 'safeboot2'", str(cm.exception.code))
+        self.assertEqual(FakeDevice.events, [])
+
+    def test_an_app_image_for_the_new_table_on_an_old_firmware_is_refused_by_its_filesystem_size(self):
+        FakeDevice.dev_extra = {"LittleFSsize": 0.75}   # an old app: no partition_layout, 768K filesystem
+        self.set_app(b"otgw-layout=safeboot2")
+        with self.assertRaises(SystemExit):
+            self.run_with_app()
+        self.assertEqual(FakeDevice.events, [])
+
+    def test_an_app_image_without_a_marker_is_not_blocked_by_the_layout_check(self):
+        FakeDevice.dev_extra = {"partition_layout": "safeboot", "partition_layout_expected": "safeboot"}
+        self.set_app(None)
+        self.assertIsNone(self.mod.app_image_layout(self.app))
+        self.mod.check_layout(self.host, None, "", self.app)   # no exception
 
     def run_main(self):
         out = io.StringIO()

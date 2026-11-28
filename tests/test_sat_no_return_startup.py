@@ -29,7 +29,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_sat_pwm_override import compile_cpp, start_gate_prelude  # noqa: E402
+from test_sat_pwm_override import compile_cpp  # noqa: E402
 import test_sat_no_return_ignition as nri  # noqa: E402
 
 FW = REPO / "src" / "OTGW-firmware"
@@ -207,8 +207,7 @@ def build_source():
     main = main.replace("static uint32_t g_nextFlow = 0, g_flowPer = 0, g_nextRet = 0, g_retPer = 0, g_pmAt = 0, g_pmDelay = 300, g_nextTick = 0;",
                         "static uint32_t g_nextFlow = 0, g_flowPer = 0, g_nextRet = 0, g_retPer = 0, g_nextTick = 0;").replace("static int g_pmDue = 0;\n", "")
     stubs = stubs.replace("static uint32_t g_pmAt, g_pmDelay; static int g_pmDue;", "static uint32_t g_pmAt = 0, g_pmDelay = 300, g_base = 1000000; static int g_pmDue = 0;")
-    gate = start_gate_prelude(src, cmd + pwm + flood)   # TASK-1942: the real start gate the PWM block now uses
-    return feed + "\n" + stubs + "\nstatic void satPwmReset_decl_unused() {}\n" + gate + cmd + "\n" + pwm + "\n" + validity + "\n" + flood + "\n" + main
+    return feed + "\n" + stubs + "\nstatic void satPwmReset_decl_unused() {}\n" + cmd + "\n" + pwm + "\n" + validity + "\n" + flood + "\n" + main
 
 
 class NoReturnStartup(unittest.TestCase):

@@ -132,15 +132,39 @@ class DisabledStateIsPublished(unittest.TestCase):
         guard = core.index("if (!satIsEnabled() || state.sat.bSafetyTripped) modeIdx = 0;")
         self.assertLess(guard, core.index('F("sat/mode")'))
 
-    def test_control_mode_command_keeps_the_actual_mode_while_disabled_or_tripped(self):
+    def _check_control_mode_handler(self, h):
+        """The rule of TASK-3151.4 (ADR-305 decision 8, entry 519): the mode command is ignored. It changes no mode (so the actual mode
+        also stays what it was while SAT is disabled or tripped), records no request, and answers with a log line; only "off" is not a
+        mode: it is the SAT switch-off (TASK-1265)."""
+        self.assertNotIn("satSetControlMode(", h, "the command must not change the control mode")
+        self.assertNotIn("eControlMode =", h)
+        self.assertNotIn("iRequestedControlMode", h, "the command records no request any more")
+        self.assertRegex(h, r'strcasecmp_P\(value, PSTR\("off"\)\) == 0\) \{\s*satHandleEnabled\("0"\);\s*return;')
+        self.assertIn("ignored", h)
+        self.assertRegex(h, r"SATDebugTf\(PSTR\(\"SAT: control_mode '%s' ignored")
+        self.assertRegex(h, r"satNarratef_P\(PSTR\(\"control_mode '%(?:\.\d+)?s' is no longer used")
+
+    def test_control_mode_command_is_ignored_and_logged(self):
         h = body(self.sat, "void satHandleControlMode(const char* value)")
-        self.assertIn("const bool live = satIsEnabled() && !state.sat.bSafetyTripped;", h)
-        calls = re.findall(r"^\s*(if \(live\) )?satSetControlMode\(", h, re.M)
-        self.assertEqual(len(calls), 3)
-        self.assertTrue(all(calls), "an unguarded satSetControlMode() call changes eControlMode while disabled")
-        for n in "012":
-            self.assertIn("state.sat.iRequestedControlMode = %s;" % n, h)
+        self._check_control_mode_handler(h)
+        # the status still publishes the actual mode and the request field (0 = auto) is unchanged in the types
         self.assertIn("iRequestedControlMode", read("SATtypes.h"))
+
+    def test_mutants_of_the_control_mode_handler_are_caught(self):
+        # the check above must be able to fail: put a mode change, a recorded request, or a missing "off" path back in memory
+        h = body(self.sat, "void satHandleControlMode(const char* value)")
+        at = "  SATDebugTf("
+        mutants = {
+            "mode change": h.replace(at, "  satSetControlMode(SAT_MODE_PWM);\n" + at, 1),
+            "recorded request": h.replace(at, "  state.sat.iRequestedControlMode = atoi(value);\n" + at, 1),
+            "no off path": h.replace('satHandleEnabled("0");', "", 1),
+            "no log line": h.replace("ignored", "taken"),
+        }
+        for name, m in mutants.items():
+            with self.subTest(mutant=name):
+                self.assertNotEqual(m, h, "the mutant did not change the handler: " + name)
+                with self.assertRaises(AssertionError):
+                    self._check_control_mode_handler(m)
 
 
 class ExternalTempSetting(unittest.TestCase):
