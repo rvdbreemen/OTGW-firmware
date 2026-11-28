@@ -8112,6 +8112,11 @@ static void satControlLoopRun()
       SATDebugTln(F("SATDHW start"));              // TASK-1521
       satNarrate_P(PSTR("Hot water: heating control paused"));
     }
+    // thermo-nova runs pwm.update() on every pass, hot water included (heating_control.py:202-215, pwm.py:117-214): a phase change that
+    // falls due during a draw (the ON time or the off time is over) is taken now. TASK-3151.4, ADR-305 decision 8, D4. The schedule
+    // only moves the PWM phase; nothing is sent from here (no CS, CH or MM). The request is the one of the last control tick, and
+    // only while that tick had heating demand (a restored PWM mode before the first tick has none).
+    if (state.sat.eControlMode == SAT_MODE_PWM && _sat_requestedSetpoint > satColdThreshold()) satPwmSchedule(_sat_requestedSetpoint);
     {   // TASK-1525: a hot-water tick returns early below, so the tuner is told here that this hour had hot water
       SatTuneTickIn ti = {};
       ti.satActive = true; ti.dhw = true; ti.error = NAN;   // no phase: a hot-water tick carries no signal
@@ -8130,10 +8135,9 @@ static void satControlLoopRun()
     satPublishMQTT();   // sat/power carries the DHW-capacity value while DHW runs (TASK-1258)
     return;
   }
-  // The branch above returns before satPwmSchedule(): a phase change that falls due during a draw is taken on the first tick
-  // after it. The ON clock itself is millis()-based and runs on through the draw, as in thermo-nova, whose pwm.update() has no
-  // hot-water pause (pwm.py:154-214; heating_control.py:202-215). TASK-3151.4, ADR-305 decision 8: entries 95, 103, 132, 158, 211
-  // (freeze, post-draw wait, resume, lapse) are gone.
+  // The branch above returns after running satPwmSchedule() for a PWM mode: the ON clock is millis()-based and a due phase change
+  // is taken during the draw, as in thermo-nova, whose pwm.update() has no hot-water pause (pwm.py:154-214; heating_control.py:
+  // 202-215). TASK-3151.4, ADR-305 decision 8: entries 95, 103, 132, 158, 211 (freeze, post-draw wait, resume, lapse) are gone.
   if (_sat_prevDhwActive) {
     SATDebugTln(F("SATDHW end"));                  // TASK-1521
     satNarrate_P(PSTR("Hot water done: heating control resumes"));
