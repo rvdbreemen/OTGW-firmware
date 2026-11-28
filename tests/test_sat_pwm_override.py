@@ -64,7 +64,7 @@ static void satNarratef_P(const char *fmt, ...) {   // SAT log sink: one "N <tex
 #define SAT_QUIRK_IMMERGAS_TP 0x02
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
-struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fOvershootMargin=2.0f; float fPwmSwitchMargin=1.5f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
+struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fPwmSwitchMargin=3.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
                      int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2;
                      int iHeatingMode=0; };   // TASK-1440: ECO gate on the zones and the solar offset
 struct Settings { SatSettings sat; };
@@ -210,9 +210,9 @@ int main(int argc, char** argv) {
 #ifdef HAS_SWITCH_TICK
     state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false;
     satPwmReset(); _pwm_effectiveBoilerTemp = 47.2f; g_flameOffStart = g_ms - 600000UL; _pwm_lastUpdateMs = g_ms - 600000UL;
-    // 37.5 >= 35 + 2: a sustained overshoot below the 3.0 K fail-safe (TASK-1762, entry 429), so the 60 s rule fires. argv[5] (optional): another
-    // flow, e.g. 45 (the pre-TASK-1762 input, 10 K over): the fail-safe fires after 30 s.
-    g_flow = (argc > 5) ? (float)atof(argv[5]) : 37.5f; setPrev(40.0f);
+    // 38.5 >= 35 + 3 (the switch margin default): a sustained overshoot, so the 60 s rule fires. argv[5] (optional): another
+    // flow, e.g. 45 (10 K over): the same 60 s rule fires (the 30 s fail-safe is gone, TASK-3151.1).
+    g_flow = (argc > 5) ? (float)atof(argv[5]) : 38.5f; setPrev(40.0f);
     float cs = 0; int ticks = 0; int contBefore = 0;
     for (; ticks < 400; ticks++) {
       g_ms += (argc > 4) ? (uint32_t)strtoul(argv[4], 0, 10) : 1000UL; _sat_tickMs = g_ms;   // argv[4]: tick interval in ms (TASK-1412.8)
@@ -954,13 +954,14 @@ class SatPwmOverride(unittest.TestCase):
                     self.assertEqual(r["ch"], "1", r)
 
     # TASK-1762: the old input of the case above (flow 45 against request 35, 10 K over) now switches through the flame-out
-    # fail-safe 30 s after the first qualifying tick, and the switch tick still sends the PWM setpoint (Q47 A, entry 88).
-    def test_failsafe_switch_tick_sends_the_pwm_setpoint_after_30s(self):
+    # TASK-3151.1: the flame-out fail-safe is gone (entries 517, 519). A flow 10 K over the request now switches by the one overshoot rule,
+    # 60 s after the first qualifying tick, and the switch tick still sends the PWM setpoint (Q47 A, entry 88).
+    def test_large_overshoot_switch_tick_sends_the_pwm_setpoint_after_60s(self):
         r = self.run_sc("swtick", 1, "x", 1000, 45)
         self.assertEqual(r["mode"], "2", r)
-        self.assertEqual(r["ticks"], "31", r)                       # first qualifying tick starts the timer, 30 s later it fires
-        self.assertEqual(r["continuous_ticks"], "30", r)
-        self.assertEqual(r["cont_marker"], "0", "the fail-safe switch tick sent the continuous setpoint: %r" % r)
+        self.assertEqual(r["ticks"], "61", r)                       # first qualifying tick starts the timer, 60 s later it fires
+        self.assertEqual(r["continuous_ticks"], "60", r)
+        self.assertEqual(r["cont_marker"], "0", "the switch tick sent the continuous setpoint: %r" % r)
         self.assertEqual(r["cs"], "48.0", r)
         self.assertEqual(r["ch"], "1", r)
 
