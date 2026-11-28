@@ -1257,7 +1257,6 @@
         "satmqttfallback": "Take over when MQTT is lost",
         "satmultiarea": "Average several room sensors",
         "satmultiareacount": "Number of sensors",
-        "satovershootmargin": "Overshoot margin",
         "satpwmswitchmargin": "PWM switch margin",
         "satovershootprotection": "PWM overshoot protection",
         "satpresetactivity": "Activity preset",
@@ -4521,7 +4520,6 @@
     // back to humanizeKey under a flat SAT card (TASK-933 mockup-alignment). ---
     // TASK-1281: the explanation of this setting (formerly an inline 'help' block) lives in settings-help.json.
     satexternaltemp:     { cat: 'sat', label: 'Use MQTT/REST as indoor temp source' },
-    satovershootmargin:  { cat: 'sat', label: 'Overshoot margin', hint: '°C' },
     satpwmswitchmargin:  { cat: 'sat', label: 'PWM switch margin', hint: '°C' },
     satboilercapacity:   { cat: 'sat', label: 'Boiler capacity', hint: 'kW' },
     satdhwcapacity:      { cat: 'sat', label: 'DHW capacity', hint: 'kW (0 = boiler capacity)' },
@@ -4590,7 +4588,7 @@
   ];
   var SAT_GROUP_DESC = { 'Averaged room sensors': 'settings.group_desc.averaged_room_sensors', 'Zones': 'settings.group_desc.zones' };
   var SAT_L3 = [
-    ['Curve', ['satcoefficient', 'satcurveselftune', 'sattempstep', 'satovershootmargin', 'satpwmswitchmargin']],
+    ['Curve', ['satcoefficient', 'satcurveselftune', 'sattempstep', 'satpwmswitchmargin']],
     ['PWM', ['satovershootprotection', 'satcyclesperhour',
              'satinterval', 'sathpcycle', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],

@@ -71,7 +71,7 @@ enum SATControlMode { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 
 struct Weather { bool bValid = false; uint32_t iLastUpdateMs = 0; float fTemperature = 0.0f; };
 struct SatSettings { bool bSimulation = false; bool bEnabled = true; bool bPushSetpoint = false; float fTargetTemp = 15.0f; };
 struct Settings { SatSettings sat; };
-struct SatState { bool bModSuppressed=false; unsigned iModSuppressionSinceMs=0; bool bSlaveCfgValid=false, bSlaveLowOffDenied=false;   // TASK-1412.4: read by the cut satRestoreDeferredStep()
+struct SatState { bool bModSuppressed=false; unsigned iModSuppressionSinceMs=0; bool bSlaveCfgValid=false, bSlaveLowOffDenied=false;   // TASK-1412.4: slave config fields of the SAT state
                   bool bLastSentValid=false, bTCAccountedValid=false, bActive=false, bSafetyTripped=false, bFallbackActive=false,
                   bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false, bPm25NoSlot=false; uint8_t iShVerdict=0;   /* TASK-1412.13, TASK-1653 */
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iTCPushMs=0;
@@ -131,8 +131,7 @@ static void satPwmReset() {}
 static void satPwmKeptClear() {}   // TASK-3039: the kept-ON-time clear of satDisable()
 static void satCycleSkipAutoSwitch() {}
 static void satDiagEventsReset() {}   // TASK-1882: called by satDisable(); tested in tests/test_sat_diag_events.py
-static bool _sat_heaterOn = true, _sat_startPwmWanted = false, _sat_startGate = false;   /* heater running: the deferred PWM restore may act */ static uint32_t _sat_startFlameOnMs = 0;
-static float satGetFlowTemp() { return 50.0f; }   // TASK-1942: the deferred restore waits for a known flow; known here   // TASK-1942: reset by satDisable(); tested in tests/test_sat_pwm_first_start.py
+static float satGetFlowTemp() { return 50.0f; }
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;
 static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false, _sat_fireplaceActive = false;   // TASK-1374: satDisable() resets it
 static int16_t satPreSatPersisted(bool) { return 0; }   // TASK-1541
@@ -226,7 +225,6 @@ int main(int argc, char** argv) {
   if (!strcmp(sc, "pwm_boot")) {       // the next boot: initSAT()'s enabled branch
     state.sat.eControlMode = SAT_MODE_OFF;
     initModeBranch();
-    printf("RESTORE %d\n", (int)_sat_pwmRestore);   // TASK-1942: armed for the deferred step
     printf("MODE %d\n", state.sat.eControlMode);
     return 0;
   }
@@ -460,18 +458,37 @@ class Persistence(unittest.TestCase):
         self.assertIn("RESTORED valid=0 pid=1", out)
 
     def test_pwm_enabled_survives_a_restart(self):
-        # Entry 121: PWM enabled before the restart comes back as PWM (thermo-nova pwm.py:111-114). Red on HEAD:
-        # continuous after every boot.
+        # Entry 121: PWM enabled before the restart comes back as PWM (thermo-nova pwm.py:111-114). Red on a build
+        # without the restore: continuous after every boot.
         Harness.setup()
         if not Harness.exe:
             self.skipTest("no host C++ compiler")
         wd = tempfile.mkdtemp(dir=Harness.dir.name)
         run("pwm_set", workdir=wd)
         _, out = run("pwm_boot", workdir=wd)
-        # TASK-1942 (entries 385/387 reason 1): the saved PWM flag is no longer applied at initSAT() while the heater may be OFF;
-        # it arms the deferred restore, which enters PWM once the heater runs and the flow is known (tests/test_sat_pwm_first_start.py)
-        self.assertIn("RESTORE 1", out)
+        # ADR-305 rule 7 (TASK-3151.2): a plain restore. The saved flag puts the mode on PWM at once (thermo-nova pwm.restore(),
+        # pwm.py:111-115): no wait for a running heater, a known flow or a MsgID 3 reply. The phase starts fresh (IDLE, plain request)
+        # and the first control tick with the heater OFF clears the flag again; that is tested on the whole loop in
+        # tests/test_sat_loop_integration.py. Entries 385/387 (TASK-1942) had armed a deferred restore here; it is gone.
+        self.assertIn("MODE 2", out)
+        self.assertNotIn("RESTORE", out)
+
+    def test_mutant_without_the_restore_boots_continuous(self):
+        # the case above must be able to fail: the same boot on a source with the restore line removed ends in continuous
+        Harness.setup()
+        if not Harness.exe:
+            self.skipTest("no host C++ compiler")
+        src = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        old = "  if (satLoadPwmEnabled()) satSetControlMode(SAT_MODE_PWM);\n"
+        self.assertEqual(src.count(old), 1, "the restore line moved; update this mutant")
+        d = Path(tempfile.mkdtemp(dir=Harness.dir.name))
+        (d / "m.cpp").write_text(build_cpp(src.replace(old, "")), encoding="utf-8")
+        mutant = compile_cpp(d / "m.cpp", d / "m.exe")
+        wd = tempfile.mkdtemp(dir=Harness.dir.name)
+        run("pwm_set", workdir=wd)
+        out = subprocess.run([str(mutant), "pwm_boot", "1"], capture_output=True, text=True, check=True, cwd=wd).stdout
         self.assertIn("MODE 1", out)
+        self.assertNotIn("MODE 2", out)
 
     def test_no_pwm_file_boots_continuous(self):
         _, out = run("pwm_boot")
