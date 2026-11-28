@@ -290,4 +290,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-304 | Rejected | - | The first public beta with remote telemetry also carries the ADR-298 guards and the new partition table, in one relea... |
 | ADR-305 | Accepted | - | SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. |
 | ADR-306 | Proposed | - | The margin of the continuous-to-PWM rule of ADR-305 is the user setting satpwmswitchmargin, with a default of 3.0. |
-| ADR-307 | Proposed | `src/**/*.py` | State one concrete chosen approach and its rationale. |
+| ADR-307 | Proposed | - | SAT takes over five 5.1.0 rules for PWM and mode switching, and keeps its own rule on the other points. |

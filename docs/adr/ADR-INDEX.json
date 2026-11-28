@@ -12580,35 +12580,65 @@
     },
     {
       "id": "ADR-307",
-      "title": "SAT PWM and mode-switching rules follow Alexwijn SAT 5.1.0 where no recorded decision conflicts: underheat flame gate, enable needs a burning flame (amends ADR-305)",
-      "path": "ADR-307-sat-pwm-and-mode-switching-rules-follow-alexwijn-sat-5-1-0-where-no-recorded-decision-conflicts-underheat-flame-gate-enable-needs-a-burning-flame-amends-adr-305.md",
+      "title": "SAT PWM and mode switching follow Alexwijn SAT 5.1.0 for the underheat flame gate, the ignition wait, the flame condition on enable, short-cycle verdicts and a 0.0 return; our rules stay elsewhere (amends ADR-305)",
+      "path": "ADR-307-sat-pwm-and-mode-switching-follow-alexwijn-sat-5-1-0-for-the-underheat-flame-gate-the-ignition-wait-the-flame-condition-on-enable-short-cycle-verdicts-and-a-0-0-return-our-rules-stay-elsewhere-amends-adr-305.md",
       "format": "canonical",
       "status": "Proposed",
       "date": "2026-11-28",
-      "decision_summary": "State one concrete chosen approach and its rationale.",
-      "topics": [],
-      "aliases": [],
-      "components": [],
-      "symbols": [],
+      "decision_summary": "SAT takes over five 5.1.0 rules for PWM and mode switching, and keeps its own rule on the other points.",
+      "topics": [
+        "alexwijn-sat-5.1.0",
+        "control-mode",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "decision table 5.1.0",
+        "enable needs flame",
+        "follow SAT 5.1.0",
+        "ignition wait 600 s",
+        "underheat flame gate"
+      ],
+      "components": [
+        "SAT control mode switching"
+      ],
+      "symbols": [
+        "satCycleCheckOvershootSwitch",
+        "satCycleCheckPwmExits"
+      ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "State required implementation constraints."
+          "Start the underheat count only when the flame has burned at least 180 s since the current flame-on edge; reset it on flame-off.",
+          "Ship (a) and (h) together: an ignition wait of 600 s, and a minimum burn and band wait of 180 s.",
+          "Reset the continuous-to-PWM overshoot count on every tick with the flame off.",
+          "Classify a PWM underheat cycle shorter than 180 s as uncertain.",
+          "Treat a return temperature of exactly 0.0 as missing.",
+          "Keep: the 5 min boot wait with the previous setpoint, the hourly-limit choices, leaving PWM on a demand stop, the plain restore, and the live-flow duty."
         ],
         "must_not": [
-          "State prohibited implementation choices."
+          "Pause PWM on a demand stop, or restore the PWM phase after a restart, before the coordinator decides on the capture count.",
+          "Change the overshoot reference before the replay decides (d2).",
+          "Raise the 180 s minimum burn or band wait together with the ignition wait.",
+          "Change the margin setting, its default or its migration (ADR-306)."
         ],
         "exceptions": [
-          "State explicit exceptions, or None."
+          "None."
         ],
         "verification": [
-          "Name the test, command, or source anchor that verifies this decision."
+          "Host tests, red on the code before this ADR and green after:",
+          "underheat from ignition does not exit before 360 s, and does exit at 360 s;",
+          "an ON phase that waits 400 s for its flame stays in PWM and then times its burn from the real ignition;",
+          "an overshoot with the flame off does not enable PWM;",
+          "a 120 s PWM underheat cycle is uncertain;",
+          "a 0.0 return gives the flow-based hold.",
+          "Unchanged: the band still waits 180 s (entry 376 test unchanged).",
+          "Replays of the indigo and gruijter recordings for (a), (d1) and the (d2) count.",
+          "Bench run by otgw-bench-tester after the build slot, not before 18:55. Nothing from this ADR is in the 313c4ba beta."
         ]
       },
       "scope": {
-        "path_globs": [
-          "src/**/*.py"
-        ]
+        "path_globs": []
       },
       "metadata": {
         "binding": false,
@@ -20790,6 +20820,54 @@
     {
       "source": "ADR-306",
       "target": "ADR-305",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-307",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-307",
+      "target": "ADR-236",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-307",
+      "target": "ADR-250",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-307",
+      "target": "ADR-253",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-307",
+      "target": "ADR-292",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-307",
+      "target": "ADR-297",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-307",
+      "target": "ADR-305",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-307",
+      "target": "ADR-306",
       "type": "related",
       "resolved": true
     }
