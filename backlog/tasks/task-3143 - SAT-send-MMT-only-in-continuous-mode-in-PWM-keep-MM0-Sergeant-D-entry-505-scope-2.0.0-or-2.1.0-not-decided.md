@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-27T21:27:00Z'
-updated_date: '2026-11-28T11:08:00Z'
+updated_date: '2026-11-28T15:11:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -52,4 +52,6 @@ Entry 514 (Q-3143a answered A by Sergeant D, 2026-11-28 05:53 UTC, release 2.0.0
 Correction to the line above: the MM=T command in satSendRelease() is at SATcontrol.ino:885 (the function starts at :882), not :886.
 
 Bench beta.496 2026-11-28: no MM check done (AC5 needs the SAT simulator window). NOT verified, no AC ticked.
+
+Bench Robert-written satsimulation window (DMs 1576192645108207669 and 1576192698610618520), laptop 12:30-16:07, .63 and .76 without boiler/thermostat, image 2.0.0-beta.496+313c4ba, evidence OTGW-field-data/bench-61|63/2026-11-28_satsim_win/. PWM ticks show mm=0 on .63 (gas boiler, satsource 1) and mm=100 on .76 (hybrid, satsource 3): both match satComputeMM. AC5 (no MM=T in a PWM ON phase with the sim) NOT judged: no boiler-type run on .63 through a PWM ON phase with the sattick mm column logged to a verdict. No AC ticked.
 <!-- SECTION:NOTES:END -->
