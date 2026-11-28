@@ -4765,41 +4765,12 @@ void satHandleControlMode(const char* value)
     satHandleEnabled("0");
     return;
   }
-  // TASK-205: avoid strcmp() with bare string literals -- use atoi() for numeric
-  // forms and strcmp_P(..., PSTR(...)) for named forms. No bare string compares.
-  int prevMode = (int)state.sat.eControlMode;
-  int numericVal = atoi(value);
-  // While SAT is disabled or tripped the actual mode stays off (sat/mode): the command only
-  // records what was requested (sat/control_mode). The control loop starts continuous on enable (TASK-3151.2).
-  const bool live = satIsEnabled() && !state.sat.bSafetyTripped;
-  if (strcasecmp_P(value, PSTR("continuous")) == 0 || numericVal == 1) {
-    state.sat.iRequestedControlMode = 1;
-    if (live) satSetControlMode(SAT_MODE_CONTINUOUS);
-  } else if (strcasecmp_P(value, PSTR("pwm")) == 0 || numericVal == 2) {
-    state.sat.iRequestedControlMode = 2;
-    // Entry 213: the veto covers the manual command too. The request stays 2 (sat/control_mode) while the actual mode
-    // (sat/mode) stays continuous; nothing re-enters PWM later, the command has to be sent again.
-    if (live) satSetControlMode(SAT_MODE_PWM);
-  } else if (strcasecmp_P(value, PSTR("auto")) == 0 || numericVal == 0) {
-    state.sat.iRequestedControlMode = 0;
-    // 'auto' leaves a running burn as it is, in continuous, and the auto-switches decide from there.
-    if (live) satSetControlMode(SAT_MODE_CONTINUOUS);
-  }
-  SATDebugTf(PSTR("SAT: control mode %d -> %d (value='%s')\r\n"),
-             prevMode, (int)state.sat.eControlMode, value);
-  if ((int)state.sat.eControlMode != prevMode) {
-    // Transition-only narration: fire on an actual mode change, not every set call.
-    satNarratef_P(PSTR("Control mode: %s"),
-                  (state.sat.eControlMode == SAT_MODE_PWM)        ? "PWM"
-                  : (state.sat.eControlMode == SAT_MODE_CONTINUOUS) ? "Continuous"
-                  :                                                   "Off");
-    const char* modeName = (state.sat.eControlMode == SAT_MODE_PWM) ? "pwm"
-                         : (state.sat.eControlMode == SAT_MODE_CONTINUOUS) ? "continuous"
-                         : "off";
-    static char _wsMsg[64];
-    snprintf_P(_wsMsg, sizeof(_wsMsg), PSTR("{\"type\":\"status\",\"msg\":\"SAT mode: %s\"}"), modeName);
-    sendWebSocketJSON(_wsMsg);
-  }
+  // TASK-3151.4 (ADR-305 decision 8, entry 519): the mode command is ignored. SAT chooses between continuous and PWM by itself,
+  // as thermo-nova, which has no mode command (climate.py: only HEAT and OFF). The endpoint stays so that Home Assistant
+  // automations that send it do not break; it answers with a log line and changes nothing (sat/control_mode stays 0 = auto).
+  // "off" above is not a mode: it is the SAT switch-off and stays. Removal of the endpoint comes in a later release.
+  SATDebugTf(PSTR("SAT: control_mode '%s' ignored, control_mode is no longer used\r\n"), value);
+  satNarratef_P(PSTR("control_mode '%s' is no longer used: SAT switches between continuous and PWM by itself"), value);
 }
 
 //=====================================================================
