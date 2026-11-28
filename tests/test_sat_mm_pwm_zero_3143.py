@@ -3,8 +3,7 @@
 
 REAL CODE: the SAT control loop, the PIC command queue and the boiler-frame feed of tests/test_sat_loop_integration.py (compiled from
 src/, nothing re-implemented). The scenarios are that file's: S1 (steady low load, 40 min, PWM with ON and OFF phases) and S7 (cold
-start). Since TASK-3151.2 (ADR-305, Robert 2026-11-28) a heating start runs in continuous, as in thermo-nova: S7 no longer reaches PWM
-at once (the PWM-first start of TASK-1942 is gone), so for S7 the test pins the new rule instead: no PWM, MM=100 and no MM=0.
+start: PWM-first start that reaches the maximum duty at once, TASK-1942).
 
 What is pinned:
   1. Once PWM has been entered (MODE 2) no MM=T goes out on the wire, whatever the duty. The hand-back MM=T of entry 47 (SAT switched
@@ -45,14 +44,14 @@ class MmInPwm(unittest.TestCase):
         late_t = [(t, x) for t, x in mm_frames(r, t_pwm) if x == "MM=T"]
         self.assertEqual(late_t, [], "MM=T sent while PWM runs (entry 505): %r" % late_t[:6])
 
-    def test_cold_start_runs_in_continuous_and_sends_mm_100_never_mm_0(self):
-        # TASK-3151.2: the start is continuous (no PWM-first start). Red on the code before it: MODE 2 at the start and MM=0 on the wire.
+    def test_cold_start_stays_continuous_and_sends_the_configured_maximum_never_mm_t(self):
+        # TASK-3151.2 (ADR-305): a heating start runs in continuous, not in PWM, so the cold-start scenario S7 has no PWM stint
+        # (it had the PWM-first start at the maximum duty before). What goes out is the continuous maximum, never MM=T.
         r = L.Run(self.exe, L.S7)
-        pwm = [t for t, x in r.kind("MODE") if x == "2"]
-        self.assertEqual(pwm, [], "a heating start entered PWM (mode 2) at %r:\n%s" % (pwm[:3], r.dump(limit=25)))
-        vals = {x for t, x in mm_frames(r)}
-        self.assertIn("MM=100", vals, "no MM=100 in the continuous start: %r" % sorted(vals))
-        self.assertNotIn("MM=0", vals, "MM=0 (the PWM value) went out in the continuous start: %r" % sorted(vals))
+        self.assertEqual([t for t, x in r.kind("MODE") if x == "2"], [], "the cold start entered PWM:\n" + r.dump(limit=25))
+        frames = mm_frames(r)
+        self.assertTrue(frames, "no MM= at all in the cold start")
+        self.assertTrue({x for t, x in frames} <= {"MM=100"}, "unexpected MM in the continuous cold start: %r" % frames[:6])
 
     def test_mm_zero_is_what_a_gas_boiler_gets_in_pwm(self):
         r = L.Run(self.exe, L.S1)
