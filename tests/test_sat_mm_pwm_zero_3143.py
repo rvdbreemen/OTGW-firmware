@@ -3,7 +3,8 @@
 
 REAL CODE: the SAT control loop, the PIC command queue and the boiler-frame feed of tests/test_sat_loop_integration.py (compiled from
 src/, nothing re-implemented). The scenarios are that file's: S1 (steady low load, 40 min, PWM with ON and OFF phases) and S7 (cold
-start: PWM-first start that reaches the maximum duty at once, TASK-1942).
+start). Since TASK-3151.2 (ADR-305, Robert 2026-11-28) a heating start runs in continuous, as in thermo-nova: S7 no longer reaches PWM
+at once (the PWM-first start of TASK-1942 is gone), so for S7 the test pins the new rule instead: no PWM, MM=100 and no MM=0.
 
 What is pinned:
   1. Once PWM has been entered (MODE 2) no MM=T goes out on the wire, whatever the duty. The hand-back MM=T of entry 47 (SAT switched
@@ -44,11 +45,14 @@ class MmInPwm(unittest.TestCase):
         late_t = [(t, x) for t, x in mm_frames(r, t_pwm) if x == "MM=T"]
         self.assertEqual(late_t, [], "MM=T sent while PWM runs (entry 505): %r" % late_t[:6])
 
-    def test_no_mm_t_on_the_wire_once_pwm_runs_cold_start_at_the_maximum_duty(self):
+    def test_cold_start_runs_in_continuous_and_sends_mm_100_never_mm_0(self):
+        # TASK-3151.2: the start is continuous (no PWM-first start). Red on the code before it: MODE 2 at the start and MM=0 on the wire.
         r = L.Run(self.exe, L.S7)
-        t_pwm = self._pwm_start(r)
-        late_t = [(t, x) for t, x in mm_frames(r, t_pwm) if x == "MM=T"]
-        self.assertEqual(late_t, [], "MM=T sent in the PWM-first start (maximum duty, entries 242/243 replaced by 505): %r" % late_t[:6])
+        pwm = [t for t, x in r.kind("MODE") if x == "2"]
+        self.assertEqual(pwm, [], "a heating start entered PWM (mode 2) at %r:\n%s" % (pwm[:3], r.dump(limit=25)))
+        vals = {x for t, x in mm_frames(r)}
+        self.assertIn("MM=100", vals, "no MM=100 in the continuous start: %r" % sorted(vals))
+        self.assertNotIn("MM=0", vals, "MM=0 (the PWM value) went out in the continuous start: %r" % sorted(vals))
 
     def test_mm_zero_is_what_a_gas_boiler_gets_in_pwm(self):
         r = L.Run(self.exe, L.S1)
