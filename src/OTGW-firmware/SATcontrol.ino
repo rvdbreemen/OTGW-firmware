@@ -2000,16 +2000,10 @@ void satPwmReset()
 // sustained-overshoot start, so no path (the control_mode command included) can carry a start from one
 // continuous stint into the next. Firmware choice: thermo-nova has no mode command; it clears the start on
 // the next update while PWM is enabled (heating_control.py:264-266).
-// PWM is entered only with the boiler's MsgID 3 permission (satPwmPermitted(); always true since entries 392/393, MsgID 3 plays no part). The callers check it first
-// to log their own path; this check is the last line, so no entry
-// path can bypass the veto.
+// MsgID 3 plays no part in PWM (entries 392/393, ADR-251): there is no permission check.
 
 static void satSetControlMode(SATControlMode m)
 {
-  if (m == SAT_MODE_PWM && !satPwmPermitted()) {
-    satPwmNoteRefused(0);
-    m = SAT_MODE_CONTINUOUS;
-  }
   if (m != state.sat.eControlMode) {
     // TASK-1521: every mode change in one place; the callers narrate their own reason
     SATDebugTf(PSTR("SATMODE from=%d to=%d\r\n"), (int)state.sat.eControlMode, (int)m);
@@ -4835,7 +4829,7 @@ void satHandleControlMode(const char* value)
     state.sat.iRequestedControlMode = 2;
     // Entry 213: the veto covers the manual command too. The request stays 2 (sat/control_mode) while the actual mode
     // (sat/mode) stays continuous; nothing re-enters PWM later, the command has to be sent again.
-    if (live) satSetControlMode(satPwmEntryAllowed(3) ? SAT_MODE_PWM : SAT_MODE_CONTINUOUS);
+    if (live) satSetControlMode(SAT_MODE_PWM);
   } else if (strcasecmp_P(value, PSTR("auto")) == 0 || numericVal == 0) {
     state.sat.iRequestedControlMode = 0;
     // 'auto' leaves a running burn as it is, in continuous, and the auto-switches decide from there.
@@ -5102,8 +5096,6 @@ void satSendStatusJSON()
     // path 0 other, 1 overshoot switch, 2 restart restore, 3 control_mode command, 4 PWM left while running
     je.field(F("slave_cfg_valid"),      snap->st.sat.bSlaveCfgValid);
     je.field(F("slave_low_off_denied"), snap->st.sat.bSlaveLowOffDenied);
-    je.field(F("pwm_veto_reason"),      (int32_t)snap->st.sat.iPwmVetoReason);
-    je.field(F("pwm_veto_path"),        (int32_t)snap->st.sat.iPwmVetoPath);
     je.field(F("boiler_status"),       snap->boilerStatus);
     je.field(F("target_temp"),          settings.sat.fTargetTemp);
     je.field(F("room_temp"),            snap->roomTemp);
@@ -8684,12 +8676,8 @@ static void satControlLoopRun()
     satNarrate_P(PSTR("Control mode: continuous (demand at the maximum setpoint)"));   // TASK-1521
   }
 
-  // Entry 214: the boiler withdrew the low-off permission (MsgID 3 HB bit 4 = 1) while PWM runs: PWM ends in this tick and
-  // the continuous setpoint below goes out in it, as with the underheat exit. Before the overshoot check, which refuses too.
-  satCycleCheckLowLoadVeto();
-
   // TASK-1652 (maintainer decision, entry 275): a lit PWM ON phase burns 180 s before the cold cutoff acts. Decided after the
-  // maximum-setpoint switch and the low-load veto, which end PWM themselves, and before the first reader of satColdThreshold().
+  // maximum-setpoint switch, which ends PWM itself, and before the first reader of satColdThreshold().
   _sat_coldCutDeferred = _sat_coldCut && satPwmColdCutWaitsForMinBurn();
 
   // --- Sustained overshoot: continuous -> PWM (Tasks #42/#43) ---

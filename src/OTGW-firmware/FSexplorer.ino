@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.482
+**  Version  : v2.0.0-beta.483
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
