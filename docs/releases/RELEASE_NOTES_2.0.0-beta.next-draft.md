@@ -1,6 +1,6 @@
-# OTGW-firmware v2.0.0-beta.NEXT Release Notes (draft skeleton: first SAT beta; the telemetry and table beta is on HOLD)
+# OTGW-firmware v2.0.0-beta.NEXT Release Notes (draft skeleton: ONE combined beta after beta.474 = the Saturday set plus the SAT mode-switching cleanup)
 
-Not a release yet. Skeleton for the beta after the Saturday 14:00 beta. Order of Robert, 28 Nov 08:32: SAT changes go first. The next beta after that one is the first SAT beta (simplified continuous/PWM switching, without the flash table). The remote telemetry and flash table beta is on HOLD, with no date. Lines marked [BENCH-TBD] are filled from the bench of that build; [verify] lines may not go out as they stand. One line per user-visible change; every claim is checked again at the release commit. Not pushed. No Sergeant D entry numbers and no names in public text. The text about remote telemetry may say nothing stronger than the approved dialog (draft 2, consent version 1).
+Not a release yet. Skeleton for the next public beta after beta.474. Order of Robert, 28 Nov 08:37 (relayed by the coordinator): SAT changes go first, the 14:00 beta is dropped, and the next beta is ONE combined image: the Saturday set plus the SAT mode-switching cleanup, at the first slot after the SAT lane is green, benched and soaked. The remote telemetry and flash table beta is on HOLD with no date (see the HOLD blocks). Lines marked [BENCH-TBD] are filled from the bench of that build; [verify] lines may not go out as they stand. One line per user-visible change; every claim is checked again at the release commit. Not pushed to the public. No Sergeant D entry numbers and no names in public text.
 
 ## Heads-up
 
@@ -21,6 +21,8 @@ Not a release yet. Skeleton for the beta after the Saturday 14:00 beta. Order of
 
 ## What is new in this beta, in plain words
 
+<!-- HOLD (telemetry and table beta, no date; Robert 2026-11-28 08:32 and 08:37). Kept for that beta, do not publish in the combined beta:
+
 ### Remote telemetry (experimental, off by default, boards with PSRAM only)
 
 - **Remote telemetry** (TASK-3092 and the recorder tasks). If you say yes in a new dialog, your gateway sends a diagnostic recording (OpenTherm messages, SAT decisions, error lines, setting changes, weather and sensor readings) to a server of the firmware maker, so we can see real systems and not only our test bench. It is off until you answer; "No" is final; you can switch it on or off under Settings > System > Remote telemetry and it stops at once. The data is deleted from the server after 30 days. To have it deleted earlier, quote your telemetry ID in a GitHub issue or on the Discord support channel; we delete everything under that ID within 7 days. Switching it off does not delete data that was already sent. Traffic on the OTmonitor port (25238) is not recorded. Read "Remote telemetry" in the manual for the full list of what is sent and what can still be in the data. [BENCH-TBD: what ran on a unit: dialog, upload, switch-off, a flash between two releases]
@@ -30,23 +32,38 @@ Not a release yet. Skeleton for the beta after the Saturday 14:00 beta. Order of
 ### Update safety (bridge guards)
 
 - **The update page checks the flash layout** [verify: ADR-298 bridge items as they land]: an image for the other layout is refused, a filesystem image of the wrong size is refused before anything is erased, and the device info shows the layout (`partition_layout`). [BENCH-TBD]
+-->
 
 ### OTGW32 hardware
 
 - **Warning, 3.3 V only:** the DI pad (GPIO 5, the S0 default) and the 1-wire pad (GPIO 4) are 3.3 V inputs and are not 5 V tolerant. Do not connect an S0 meter or sensor that drives them to 5 V or 12 V (reported by the board's hardware owner).
 
-### SAT: mode switching follows thermo-nova [HOLD until shipped]
+### SAT: mode switching follows thermo-nova, and the extra rules are gone [HOLD until shipped]
 
-<!-- HOLD: this block goes out only in the beta that carries steps 3a to 3c of the SAT mode-switching task (Robert, 2026-11-28 08:27: next possible beta). Fill the TASK ids, the build and the numbers from that build; every [BENCH-TBD] is replaced by what was measured, or the line is cut. Public text: no entry numbers, no names. -->
+<!-- HOLD: goes out only in the beta that carries steps 3a to 3d of the SAT mode-switching task (Robert, 2026-11-28: one beta, all steps, no Sergeant D question). Fill the TASK ids, the build and the numbers from that build; every [BENCH-TBD] is replaced by what was measured, or the line is cut. Public text: no entry numbers, no names. Rule 7 (hot-water pause) is only written as a change after the thermo-nova climate.py is read and cited. -->
 
-- **SAT starts in continuous mode again and no longer switches back to PWM on its own fail-safe.** Before, every heating start began in PWM, SAT then went to continuous after a few minutes, and a flame-out fail-safe could push it back to PWM. Two long field runs showed about one switch every half hour. Now SAT follows the original design: it starts in continuous, goes to PWM only when the boiler flow stays at least 3.0 C above what SAT asks for during 60 seconds, and leaves PWM when the flow stays 3.0 C below the request for 180 seconds or when PWM has had no off time left for 300 seconds. [TASK ids follow]
-- **What changes for you:** fewer switches between continuous and PWM, so a steadier flow temperature. Your settings are kept, except one: the setting "PWM switch margin" disappears (SAT uses the fixed margin of 3.0 C); a stored value is dropped [verify: what the firmware does with a stored value]. If you used that setting to tune your boiler, check the heating curve of your first day on this beta. [BENCH-TBD: the switch count of the replay of the two recorded field runs on the finished code; one bench run with the SAT simulator, not a real boiler; what happens to a stored margin and to a POST of the old key]
-- **Not changed:** the heating-curve tune, the tolerance band, the maximum modulation rules and the hot-water pause stay as they are.
+- **SAT starts in continuous mode again and no longer has its own way back to PWM.** Before, every heating start began in PWM, SAT then went to continuous after a few minutes, and a flame-out fail-safe could push it back to PWM. Two long field runs showed about one switch every half hour. Now SAT follows the original design: it starts in continuous and goes to PWM only when the boiler flow stays at least 3.0 C above what SAT asks for during 60 seconds. It leaves PWM when the flow stays 3.0 C below the request for 180 seconds or when PWM has had no off time left for 300 seconds. After a restart SAT puts the PWM state back as it was. [TASK ids follow]
+- **What changes for you:** fewer switches between continuous and PWM, so a steadier flow temperature. The setting "PWM switch margin" disappears (SAT uses the fixed margin of 3.0 C); a stored value is dropped [verify: what the firmware does with a stored value and with a settings write of the old key]. If you used that setting to tune your boiler, check the heating curve on your first day with this beta. [BENCH-TBD: the switch count of the replay of the two recorded field runs on the finished code; one bench run with the SAT simulator, not a real boiler]
+- **SAT mode command ignored:** the manual mode command (auto, continuous, PWM) no longer changes anything; it is ignored and a log line says so, so Home Assistant automations that send it do not break. It will be removed in a later release. The OFF state (SAT off, safety trip, lost OpenTherm link) stays.
+- **The PWM on-time resets on every exit** from PWM (before, SAT kept the used on-time and continued it on return).
+- **The PWM clock keeps running during a hot-water draw** (before, it paused during the draw and shortly after). [verify: only after the thermo-nova climate.py is read and cited]
+- **Heating switches off at once** when it has to (before, SAT kept it on until the flame had burned 180 seconds). [BENCH-TBD: with a real boiler this is not verified]
+- **Not changed:** the tolerance band, the maximum modulation rules (0 in PWM, the configured maximum in continuous), the heating-failure warning and the heating-curve self-tune; they read the PWM state and are re-tested [BENCH-TBD].
 - **Not verified yet:** behaviour with a real boiler over a full heating day.
 
-### SAT, web UI and other changes
+### Changes of the Saturday set [verify each against the landed commit before the release commit]
 
-- [Filled from the lane list of the build commit: one line per user-visible change with its TASK number. Candidate B (the MM change, the heating-failure warning, web) goes into the Sunday beta unless the coordinator moves it.]
+- **Heating-failure warning:** the 15 minute window counts only while SAT has central heating enabled, so a pause of the tolerance band no longer raises a warning; hours inside a pause are no longer flagged or dropped from the self-tune (TASK-3112). [verify: the PWM OFF phase rule against the lane]
+- **SAT maximum modulation:** SAT sends the maximum-modulation value `MM=T` only when it hands the boiler back (SAT off, restart) and not inside PWM, where the value stays 0; continuous mode keeps the configured maximum (TASK-3143). Host tests so far; a real unit is still to be benched.
+- **Graph history** records the room temperature that SAT actually controls on, not always the thermostat room, so captures no longer look like overheating that is not there (TASK-3007).
+- **Web UI on OTGW32 boards:** hides items that exist only with a PIC, shows the LED help for the board you have, and an S0 pin of -1 shows an empty field with a hint (TASK-3121).
+- **Settings help in Dutch, German and Greek:** 166 texts each (TASK-2927). [verify: app size against the size gate]
+- **Update fix (FS-OTA):** [verify: what the filesystem-update fix changes for the user]
+- Tools in the release zip, not in the firmware image: [verify: capture tool items of TASK-2979 and TASK-3009 if they ride]
+
+### Other changes
+
+- [Filled from the lane list of the build commit: one line per user-visible change with its TASK number.]
 
 ## Not verified yet, in plain words
 
