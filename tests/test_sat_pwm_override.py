@@ -109,11 +109,6 @@ static bool hasOTCommandInterface() { return g_hasOT; }
 static bool satEnqueueIfChangedCS(float cs) { g_csSent++; g_csLast = cs; return true; }
 void satCycleResetSustainGuards();                                    // defined in the cut SATcycles block
 void satCycleSkipAutoSwitch();                                        // idem (TASK-1367; a no-op stub on HEAD)
-// TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted
-static bool satPwmPermitted() { return true; }
-static void satPwmNoteRefused(uint8_t) {}
-static bool satPwmEntryAllowed(uint8_t) { return true; }
-static bool satCycleCheckLowLoadVeto() { return false; }
 
 #define DUE(t) (g_due)
 #define timerSATSuppress 0
@@ -512,24 +507,7 @@ def extract(src: str) -> str:
     clock = "static uint32_t _sat_tickMs = 0;\n" if "static uint32_t _sat_tickMs" not in block + tick else ""
     # TASK-3039 (entry 479): the resumed ON phase reads the real CH flame-on, which sits above the cut (SATcontrol.ino ~960)
     clock += "static uint32_t _sat_chFlameOnMs = 0;\n" if "_sat_chFlameOnMs" in block + tick and "static uint32_t _sat_chFlameOnMs" not in block + tick else ""
-    return clock + start_gate_prelude(src, block + tick) + block + "\n" + mm + "\n" + tick
-
-
-def start_gate_prelude(src: str, body: str) -> str:
-    """TASK-1942 (entries 385/387/389/391): the real start gate (its state and satStartGateActive()) sits above the PWM
-    block in SATcontrol.ino; satSetControlMode() and satDisable() clear it, the flame edge anchors it and the PWM exits read
-    it, so a harness that cuts any of those needs it. Returns the gate block when `src` has it and `body` does not, plus a
-    no-op satPwmFirstStart() when `body` calls it without defining it (the heating start has many dependencies;
-    tests/test_sat_pwm_first_start.py runs the real one). Empty on code before TASK-1942."""
-    if "static const uint32_t SAT_START_GATE_MS" not in src or "static const uint32_t SAT_START_GATE_MS" in body:
-        return ""
-    src = src.replace("\r\n", "\n")
-    g0 = src.index("static const uint32_t SAT_START_GATE_MS")
-    g1 = src.index("\n}\n", src.index("static bool satStartGateActive()")) + 3
-    gate = src[g0:g1] + "\n"
-    if "satPwmFirstStart()" in body and "static void satPwmFirstStart()" not in body:
-        gate += "static void satPwmFirstStart() {}\n"
-    return gate
+    return clock + block + "\n" + mm + "\n" + tick
 
 
 def _vcvars():
