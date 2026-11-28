@@ -46,7 +46,7 @@ STUBS = r"""
 #define PSTR(x) x
 static const float SAT_HC_REF_TEMP = 20.0f;
 @ENUMS@
-struct SatSettings { float fHeatingCurveCoeff = 1.6f; float fOvershootMargin = 2.0f; float fPwmSwitchMargin = 1.5f; };
+struct SatSettings { float fHeatingCurveCoeff = 1.6f; float fPwmSwitchMargin = 3.0f; };
 struct Settings { SatSettings sat; };
 struct SatState { SATBoilerStatus eBoilerStatus = SAT_BS_OFF; bool bBoilerStatusKnown = false; bool bDhwActive = false;
                   bool bModulationReliable = false; float fFinalSetpoint = 0; float fLastCycleDuration = 0;

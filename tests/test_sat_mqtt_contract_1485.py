@@ -190,7 +190,7 @@ struct SatState {
   bool bPressureAlarm = false, bPressureHealthy = true, bDhwActive = false, bModulationReliable = false;
 };
 struct State { SatState sat; }; static State state;
-struct SatSettings { float fOvershootMargin = 3.0f; float fPwmSwitchMargin = 1.5f; }; struct Settings { SatSettings sat; }; static Settings settings;
+struct SatSettings { float fPwmSwitchMargin = 3.0f; }; struct Settings { SatSettings sat; }; static Settings settings;
 struct OTState { float RelModLevel = 0; }; static OTState OTcurrentSystemState;
 static const float SAT_EPS_PRESSURE = 0.01f, SAT_EPS_FRACTION = 0.001f, SAT_EPS_ERROR = 0.01f, SAT_EPS_TEMP_COARSE = 0.1f;
 static uint32_t g_now = 1000; static uint32_t millis() { return g_now; }
