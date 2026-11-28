@@ -66,7 +66,7 @@ All 5.1.0 citations are `custom_components/sat/<file>:<line>` at `9c2fad9`, open
 
 ## Decision
 
-SAT takes over five 5.1.0 rules for PWM and mode switching, and keeps its own rule on the other points. One point is decided by a replay.
+SAT takes over five 5.1.0 rules for PWM and mode switching, and keeps its own rule on the other points. One more point (the overshoot reference) was checked by a replay and stays ours.
 
 **Adopted (step 1, in this order):**
 
@@ -115,15 +115,19 @@ SAT takes over five 5.1.0 rules for PWM and mode switching, and keeps its own ru
     - the OFF state (entry 519, rule 4b);
     - the maximum-modulation rules (entries 505 and 514).
 
-**Decided by a replay (step 2):**
+**Decided by a replay (step 2): kept as ours.**
 
-12. **(d2) The overshoot reference: the highest request of the last 300 s (5.1.0, `heating_control.py:388`, `:407-415`) or this tick's request (ours, entry 497).**
-    - otgw-poc-dev replays the indigo and gruijter recordings with both rules, and counts the PWM entries that start within 5 min after a request drop.
-    - The look-back is adopted only if every entry it removes later ended through underheat or saturation. Otherwise ours stays.
-    - If it is adopted, entry 497 is overridden.
+12. **(d2) The overshoot reference stays this tick's request (ours, entry 497), not the highest request of the last 300 s (5.1.0, `heating_control.py:388`, `:407-415`).**
+    - The criterion, set before the replay: the look-back is adopted only if every entry it removes later ended through underheat or saturation.
+    - The count (otgw-poc-dev, `OTGW-field-data/_replay_tools/poc_dev_step1/out/D2_count.md`, read by otgw-architect): gruijter 30.8 h, marceld91d, indigo 22 and 24 Nov, margin 3.0.
+      - 88 recorded PWM entries; 38 had a request drop of at least 0.5 C in the 300 s before; the current rule fires on 31 of them.
+      - The look-back would not fire on 24 of those (flow below the highest request of 300 s + 3.0).
+      - Of the 24: 2 end in an exit to continuous within 30 min with CH asked, 12 stay in PWM, 10 end with heating off.
+    - 2 of 24 does not meet the criterion. Coordinator decision, 2026-11-28 19:53 laptop time: (d2) is not adopted; entry 497 stays.
+    - Caveats: the replay is open loop (recorded flow and request are fed in; nothing reacts to the decision). The recordings come from other builds (beta.451/452 and beta.410) with other rules, some with margin 2.0, so an "entry" is what the recorded unit did. An "exit" is any return to continuous within 30 min with CH asked; its reason is not separated. The 0.5 C drop threshold is otgw-poc-dev's choice.
 
 **What this changes in ADR-305:**
-- Decision 2: enable only with a burning flame, and (d2) if the replay adopts it.
+- Decision 2: enable only with a burning flame. The overshoot reference is unchanged ((d2) not adopted).
 - Decision 3: the underheat flame gate.
 
 Decisions 7 and 8 stay. Nothing in ADR-306 changes.
@@ -142,7 +146,7 @@ Decisions 7 and 8 stay. Nothing in ADR-306 changes.
 ### Must Not
 
 - Pause PWM on a demand stop, or restore the PWM phase after a restart, before the coordinator decides on the capture count.
-- Change the overshoot reference before the replay decides (d2).
+- Change the overshoot reference: (d2) is not adopted, entry 497 stays.
 - Raise the 180 s minimum burn or band wait together with the ignition wait.
 - Change the margin setting, its default or its migration (ADR-306).
 
@@ -159,7 +163,11 @@ Decisions 7 and 8 stay. Nothing in ADR-306 changes.
   - a 120 s PWM underheat cycle is uncertain;
   - a 0.0 return gives the flow-based hold.
 - **Unchanged:** the band still waits 180 s (entry 376 test unchanged).
-- **Replays** of the indigo and gruijter recordings for (a), (d1) and the (d2) count.
+- **Replays** (open loop, otgw-poc-dev, `OTGW-field-data/_replay_tools/poc_dev_step1/out/TABLE_current_vs_new.md`, read by otgw-architect):
+  - (a): the 180 s flame gate removes 4 of 5 underheat triggers on gruijter (5 to 1) and 2 of 2 on marceld91d (2 to 0); the saturation exit takes over (gruijter 9 to 11, marceld91d 2 to 4), so the entry-492 order (saturation before underheat at a cold start) holds again. Indigo: 0 and 0.
+  - (d1): no change in these data.
+  - (d2): the count above.
+  - Not covered by the replay: (h), (i) and (k).
 - **Bench run** by otgw-bench-tester after the build slot, not before 18:55. Nothing from this ADR is in the 313c4ba beta.
 
 ## Alternatives Considered
@@ -169,7 +177,7 @@ Decisions 7 and 8 stay. Nothing in ADR-306 changes.
   - the rest of (i) would drop a safer default;
   - (c) was rejected by Robert.
 - **Ask Sergeant D first on every point (entry 540).** Replaced by entry 542: the team decides, and Sergeant D is informed.
-- **Adopt (d2) at once.** Rejected for now. Neither side has evidence; the replay decides.
+- **Adopt (d2).** Rejected after the replay: the look-back would have removed 24 PWM entries, and only 2 of them later ended in an exit to continuous (see item 12).
 - **Raise the shared 180 s constant to 600 s.** Rejected: it would also make the band wait 600 s (entry 376).
 
 ## Consequences
@@ -186,12 +194,12 @@ Decisions 7 and 8 stay. Nothing in ADR-306 changes.
 
 - A boiler that really cannot keep up stays in PWM up to about 3 min longer after ignition. Mitigation: saturation (300 s) still ends it first (entry 492).
 - A boiler that does not ignite is timed out after 600 s instead of 180 s. Mitigation: the `no_ignition` alarm counts on its own and does not use this constant (otgw-poc-dev; its own threshold is not checked).
-- The rules are partly aligned. Mitigation: (b), (f) and (d2) each have a named measurement and an owner.
-- Sergeant D's entries 80, 263 (partly), 456 (revived), 496 and, if (d2) is adopted, 497 are overridden or revived without asking him first. Mitigation: BlueFlame informs him per step ("what we do and why, tell us if you see a reason"), and a reason he gives goes to the coordinator.
+- The rules are partly aligned. Mitigation: (b) and (f) have a named measurement and an owner; (d2) was measured and kept.
+- Sergeant D's entries 80, 263 (partly), 456 (revived) and 496 are overridden or revived without asking him first. Mitigation: BlueFlame informs him per step ("what we do and why, tell us if you see a reason"), and a reason he gives goes to the coordinator.
 
 ## Open Questions
 
-- [ ] (d2) The replay on the indigo and gruijter recordings decides: the 300 s look-back is adopted only if it removes only entries that later end through underheat or saturation. Owner: otgw-poc-dev; the coordinator decides on the result.
+- [x] (d2) The replay on the indigo and gruijter recordings decides: the 300 s look-back is adopted only if it removes only entries that later end through underheat or saturation. **Answered 2026-11-28 by the coordinator (decision, 19:53 laptop time, on otgw-poc-dev's count), recorded by Agent: Claude (otgw-architect):** not adopted; 2 of the 24 removed entries later ended in an exit. Entry 497 stays. See item 12.
 - [ ] (b) and (f) are revisited after steps 1 and 2. The input is a capture count of heating restarts after a pause that overshoot into PWM within 10 min. Owner: the coordinator.
 - [ ] (h) The `no_ignition` alarm threshold is checked, so that a 600 s wait and the alarm do not contradict each other. Owner: otgw-poc-dev.
 - [x] (c) PWM duty: the held boiler floor as 5.1.0, or the live flow as now. **Answered 2026-11-28 by Robert van den Breemen (decision, DM 1576247783747231919), recorded by Agent: Claude (otgw-architect):** "A" (14:45:56 UTC, to BlueFlame's question 1576215743375351899): "(c) niet overnemen: onze live-aanvoerduty blijft; de rest van 5.1.0 wel." Register entry 541.
@@ -199,7 +207,7 @@ Decisions 7 and 8 stay. Nothing in ADR-306 changes.
 
 ## Related Decisions
 
-- **ADR-305**: amended in Decision 2 (flame condition; (d2) if the replay adopts it) and Decision 3 (underheat flame gate). Decisions 7 and 8 stay.
+- **ADR-305**: amended in Decision 2 (flame condition only; (d2) not adopted) and Decision 3 (underheat flame gate). Decisions 7 and 8 stay.
 - **ADR-306**: unchanged; the margin setting is a kept deviation.
 - **ADR-292**: governs the ranking; the reference now follows the latest 5.x release (entries 536 and 537).
 - **ADR-236**, **ADR-297**: their 180 s underheat flame gate returns in this form (entry 456).
