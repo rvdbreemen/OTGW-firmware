@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-28T10:17:00Z'
+updated_date: '2026-11-28T10:25:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -26,3 +27,9 @@ Sergeant D asked us to pay attention to https://github.com/Alexwijn/SAT/issues/2
 - [ ] #2 The flow-despite-zero-return statistics (delta flow-return) are checked and the result is written in the task notes
 - [ ] #3 Bench check on a boiler that reports 0.0 as return temperature, if one exists; otherwise stated as not verified
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Register entry 532 (Sergeant D, 2026-11-28 10:21 UTC, Q-216a answered A; his msgID18 in entry 531 was MsgID 28): a return temperature of exactly 0.0 is treated as missing, so the flow-based hold applies. Release 2.0.0, after the SAT beta, host test first (red on 313c4ba, then green). The place of the change (feed class FreshZero in SATboilerFeed.h or satReturnFresh in SATcontrol.ino) is for the builder; also check the delta flow-return statistics.
+<!-- SECTION:NOTES:END -->
