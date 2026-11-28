@@ -74,6 +74,10 @@ The margin of the continuous-to-PWM rule of ADR-305 is the user setting `satpwms
   - the underheat exit stays a fixed rule.
   - This ADR follows that reading. Acceptance waits for his confirmation.
 - **`satovershootmargin` goes.** The classification label (`SATcycles.ino:961`) and the overshoot-seconds count (`SATcycles.ino:1287`) read `satpwmswitchmargin` instead. The key `SATovershootmargin` (`settingStuff.ino:385`) is no longer written, and an old key in `settings.ini` is ignored on load. Its REST, MQTT and web UI fields go. With one margin, the label and the verdict can no longer disagree.
+- **Removed, no alias** (decided by the coordinator, 09:40). A write to `overshoot_margin` does not set `satpwmswitchmargin`. Reasons:
+  - An alias would be a second way in to the same margin, which is what Robert objected to.
+  - Few automations can depend on it. The MQTT command `overshoot_margin` has been on the dev line since 2026-04-05 (commit 4d482ab53, `git log -S`), but the 2.x line has been public only through betas since 2026-11-01, run by a small group of testers. The coordinator gave the reason as "from the recent 2.0.0 betas (TASK-1485 era)". The git history shows the command is older than that; the small number of 2.x users is what carries the argument.
+  - If Robert asks for an alias, this ADR changes.
 - **Register.** Entry 523 (OTGW-sat-decisions main ec2c041) records the verdict and migration decisions of the coordinator. It supersedes the part of entry 522 that reads "verdict + underheat stay 3.0" for the verdict. Entry 522 stands for the setting with default 3.0, and for the underheat exit.
 - **The underheat exit stays fixed:** requested - 3.0 C for 180 s (ADR-305 Decision 3, `cycles/const.py:11`). The 60 s hold and the 300 s saturation exit also stay as ADR-305 has them.
 - **One-time migration to 3.0** (decided by the coordinator, 09:02; reversible; Robert is told; register entry 523).
