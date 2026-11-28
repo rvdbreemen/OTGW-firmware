@@ -15,8 +15,8 @@ reachable on the host through the real functions, and a new published field woul
 
 Safe fallback and re-entry, where the code and the recorded entries already define them (all asserted below as source patterns):
   * PWM OFF phase and cold cutoff: CS=10 together with CH=0 (entries 5, 9, 17; SATchEnable.h satChEnableDecide).
-  * The MsgID 3 HB bit 4 veto is GONE (TASK-3151.4, ADR-305 decision 8, Robert 2026-11-28; thermo-nova has none): no code path falls
-    back to continuous or refuses a PWM entry because of that bit. Continuous still sends CH=1 (truth table above).
+  * MsgID 3 HB bit 4 plays no part in PWM (entries 392/393, ADR-251, TASK-3151.4): the veto that fell back to continuous (entry 214) and the
+    entry gate (entries 213, 215) are gone; continuous sends CH=1 unless the cold cutoff holds (truth table below).
   * No boiler reply for 30 s: hand-back CS=0, CH=1, MM=T once, then nothing until a reply returns (entry 47; satOtLinkStep, SATcontrol.ino).
   * SAT switched off or tripped: the same hand-back (satDisable / satSendRelease, TASK-1346, 1344, 1574).
   * PIC restart: the MM= and CH= it forgot are sent again (satNotifyPicRestart, TASK-1570), and an unchanged value is repaired after 60 s
@@ -178,12 +178,12 @@ class RequestedVsTransmitted(unittest.TestCase):
         self.assertRegex(core, r"bool isCentralHeatingEnabled\(\)\s*\{\s*return OTcurrentSystemState\.MasterStatus & 0x01;")
 
     # ---- safe fallback and re-entry: where they are defined ---------------------------------------------------------------------
-    def test_there_is_no_msgid3_veto_and_continuous_sends_ch_1(self):
-        # Red on the code before TASK-3151.4: satCycleCheckLowLoadVeto / satPwmPermitted / satPwmEntryAllowed existed and were called.
-        code = "\n".join(l for l in (CYC + "\n" + SAT).splitlines() if not l.lstrip().startswith("//"))
+    def test_no_low_load_veto_exists_and_continuous_sends_ch_1(self):
+        # TASK-3151.4 (ADR-251): the MsgID 3 veto that fell back to continuous in the same tick is gone, so there is no fallback to test;
+        # what stays true is the truth table: continuous sends CH=1 unless the cold cutoff holds.
+        code = "\n".join(l for l in CYC.split("\n") if not l.lstrip().startswith("//"))
         for name in ("satCycleCheckLowLoadVeto", "satPwmPermitted", "satPwmEntryAllowed", "satPwmNoteRefused"):
-            self.assertNotIn(name, code, "%s is back: the MsgID 3 veto is gone (ADR-305 decision 8)" % name)
-        # continuous: pwmDrivesSetpoint false, so CH=1 unless the cold cutoff holds (truth table above)
+            self.assertNotIn(name, code, name + " is gone (ADR-251)")
         self.need()
         self.assertTrue(any(r["req"] == "40.0" and r["drives"] == "0" and r["ch"] == "1" for r in self.truth))
 
