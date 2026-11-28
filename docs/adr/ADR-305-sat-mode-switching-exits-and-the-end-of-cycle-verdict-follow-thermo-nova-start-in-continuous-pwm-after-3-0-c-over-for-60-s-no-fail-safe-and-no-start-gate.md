@@ -90,7 +90,7 @@ Robert ordered option A of that plan on 2026-11-28: SAT switches as thermo-nova 
   - The loop calls `update()` on every run. It skips only without an outside temperature or with HVAC off (`climate.py:544-545`). There is no hot-water branch, so the PWM clock keeps running during a draw. Only the enable and exit guards pause for hot water (HC:268-274, `:313-315`).
   - A restart restores the saved PWM flag at once (`climate.py:169-176`, `pwm.py:111-115`).
   - A change of HVAC mode or target resets only the PIDs, never PWM (`climate.py:461-464`, `:583`, `:660`).
-  - There is no mode command: the presets are temperature presets (`climate.py:604-640`, as read by otgw-poc-dev; not opened by me).
+  - There is no mode command. `async_set_preset_mode()` sets a temperature preset (`climate.py:604-615` opened in this session; the rest of the function, to `:640`, as read by otgw-poc-dev).
 - **Heater off** (`heating_control.py:64-72`, `:229-238`). No HEAT mode, closed valves or a request at or below 22 C disable PWM on that tick and send setpoint 10.0 with CH off. There is no 180 s delay.
 - **What thermo-nova does not have:**
   - a start in PWM or a start gate;
@@ -103,7 +103,7 @@ Robert ordered option A of that plan on 2026-11-28: SAT switches as thermo-nova 
 SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The firmware's extra mode rules are removed.
 
 1. **Start.** Every heating start runs in continuous. PWM comes only through rule 2 or the end-of-cycle verdict.
-2. **Continuous to PWM.** Flow >= requested setpoint + 3.0 C, held for 60 s, with thermo-nova's gates (HC:262-305): PWM not yet on; outside hot water and the 300 s after it; heating demand, with the request above the cold setpoint; a known flow. The margin is a fixed 3.0. The setting `satpwmswitchmargin` no longer drives the switch.
+2. **Continuous to PWM.** Flow >= requested setpoint + 3.0 C, held for 60 s, with thermo-nova's gates (HC:262-305): PWM not yet on; outside hot water and the 300 s after it; heating demand, with the request above the cold setpoint; a known flow. The margin is a fixed 3.0 (`cycles/const.py:10`). The setting `satpwmswitchmargin` is removed, and an old key in `settings.ini` is ignored on load (post rule 10).
 3. **PWM to continuous.** These exits run only in the PWM ON phase, with heating demand, and outside hot water and its 300 s:
    - **underheat:** flow <= requested - 3.0 C for 180 s;
    - **saturation:** no off time for 300 s.
@@ -111,7 +111,7 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
    Two more ways out:
    - **at the maximum:** a request at or above the maximum setpoint ends PWM on that tick (HC:203-204, entry 463), now without the 60 s start gate;
    - **heater off:** ends PWM as before (ADR-199).
-4. **End-of-cycle verdict** (`pwm.py:219-227`). A continuous cycle classified OVERSHOOT enables PWM. A PWM cycle classified UNDERHEAT disables it. The classifier's overshoot margin for this verdict is 3.0 (`cycles/classifier.py:74`), not 2.0.
+4. **End-of-cycle verdict** (`pwm.py:219-227`). A continuous cycle classified OVERSHOOT enables PWM. A PWM cycle classified UNDERHEAT disables it. The margin of this verdict is the fixed 3.0 of thermo-nova (`cycles/classifier.py:74`, `cycles/const.py:10`), not 2.0 (post rule 12; Robert's go of 08:27, entry 518). The user setting `satovershootmargin` (`fOvershootMargin`, 2.0) stays only for the displayed classification label. It gets no migration and no new default. If the label and the verdict disagree for a cycle, the verdict decides the mode, and the implementer notes it in the task.
 5. **Removed:**
    - the start in PWM (`satPwmFirstStart()`, `SATcontrol.ino:4400`);
    - the start gate (`satStartGateActive()`, `SATcontrol.ino:980`, `SAT_START_GATE_MS` `:973`);
@@ -119,11 +119,18 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
    - the one-PWM-entry-per-flame lock (`_cycle_burnLeftPwm`, `SATcycles.ino:189`, set at `:1511` and `:1528`);
    - the 180 s flame gate on the underheat exit (`SAT_UNDERHEAT_FLAME_MIN_MS`, `SATcycles.ino:51`).
 6. **Kept as they are:**
-   - The restore of a saved PWM flag after a restart, which thermo-nova also does (entry 121; `pwm.py:111-115`).
    - The tolerance band (ADR-250, ADR-253).
    - The start-up setpoint sequence of entries 344, 347 and 348: return + 18 while the flame is off, a 20 s hold, then flow - 1.0. That is setpoint logic, not the choice of mode, and this ADR does not decide it.
 
-7. **Cleanup in the same beta** (plan step 3d, entry 519: "I want a cleanup in one go"; Sergeant D, entry 520: "No rules to keep."):
+7. **Restart: a plain restore** (post rule 9, entry 518 step 3b).
+   - What thermo-nova does: the saved PWM-enabled flag is set at once at restore (`climate.py:169-176`, HC:181-184, `pwm.py:111-115`). It does not wait for the heater or a known flow.
+   - The PWM status stays IDLE until `pwm.update()` runs with the heater on. While it is IDLE the control mode is continuous (HC:147-152), so the setpoint is the continuous one.
+   - A heater that is off at the first tick clears the flag (HC:229-231).
+   - The firmware does the same. The deferred restore goes: `satRestoreDeferredStep()` (`SATcontrol.ino:4419`) waits for the heater to be on and the flow to be above 0.
+   - ADR-252 recorded a boot pitfall: PWM idled while the flow was unknown, and the plain request lit the boiler without the flame-off hold. With the status IDLE, SAT now sends the continuous setpoint and the start-up sequence of entry 348, as for any start in continuous. The flag only lets the first `pwm.update()` with the heater on start PWM. The implementer shows this in `tests/test_sat_loop_integration.py`.
+   - Entry 121 stays: SAT stays quiet until it has a valid boiler reply and a valid outside temperature, then the flag is restored. Entry 388 stays too (the 60 s boot silence).
+   - Entry 462 agrees: only the enabled flag returns, and the PWM phase starts fresh.
+8. **Cleanup in the same beta** (plan step 3d, entry 519: "I want a cleanup in one go"; Sergeant D, entry 520: "No rules to keep."):
    - **No kept PWM ON time.** Every PWM exit resets the PWM state, as `pwm.disable()` calls `reset()` (`pwm.py:87-100`, `:106-109`). The freeze and resume of ADR-296 go. The 180 s minimum flame-on hold inside an ON phase stays, timed from the flame-on that ON phase sees (`pwm.py:200-202`).
    - **No hot-water pause of the PWM clock.** The control loop runs during a draw. `climate.py:544-545` skips it only without an outside temperature or with HVAC off, and `climate.py` has no hot-water reference. `pwm.update()` has no hot-water branch in its ON/OFF timing (`pwm.py:154-214`). The only hot-water check is in the low-duty case (`pwm.py:248`). The enable and exit guards keep their own hot-water pause and the 300 s after it (HC:268-274, `:313-315`).
    - **The cold cutoff acts at once.** Without heating demand, PWM is disabled on that tick (HC:229-234). There is no 180 s wait before a cold cutoff ends an ON phase.
@@ -154,7 +161,10 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
 - Reset the PWM ON time on every PWM exit.
 - Keep the PWM ON/OFF clock running during a hot-water draw.
 - End PWM on the tick the cold cutoff (no heating demand) comes.
-- Answer a `control_mode` write with a log line and no mode change.
+- Answer a `control_mode` write with a log line and no mode change. The OFF state (SAT off, safety trip, lost OpenTherm link; post rule 4b) stays.
+- After a restart, restore a saved PWM flag at once, once the boot silence and the entry-121 wait are over. Keep the PWM status IDLE (continuous setpoint) until the first update with the heater on.
+- Time the 180 s minimum flame-on hold inside a PWM ON phase exactly as thermo-nova does: from the flame-on that the ON phase sees, also after a timed-out first-flame wait (`pwm.py:144-146`, `:200-202`).
+- Drop the parts of entries 158 and 211 that are specific to a hot-water draw: the hold is not frozen through a draw, and there is no lapse rule. otgw-poc-dev states per entry, in the step 3d task, which line of the old code maps to which thermo-nova line.
 
 ### Must Not
 
@@ -172,19 +182,22 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
 
 - **Host test `tests/test_sat_overshoot_sustain.py`**, written by otgw-poc-dev. It compiles the real `satCycleCheckOvershootSwitch()` and `satCycleCheckPwmExits()`. Every case is red on origin/dev before the change and green after:
 
-  | Case | Expected |
-  |---|---|
-  | Flow 3.0 C over for 30 s | no switch (the fail-safe is gone) |
-  | Flow 2.9 C over, held | never switches |
-  | Flow 3.0 C over for 60 s | switches (today it already switches at 2.0 C) |
-  | Flow 3.0 C under, from ignition | exit 180 s after the first qualifying tick (today about 360 s, because of the flame gate) |
-  | Re-entry in the same flame after an exit | allowed |
-  | At the maximum setpoint | ends PWM at once, with no 60 s start gate |
+  | Case | Expected after the change | Today (origin/dev) |
+  |---|---|---|
+  | Flow 2.5 C over, held 120 s | no switch | switches at 60 s (2.0 C margin): red |
+  | Flow 3.0 C over: checked at 30 s, then at 60 s | no switch at 30 s, switch at 60 s | switches at 30 s (fail-safe): red |
+  | Flow 3.0 C under from ignition, flame on | exit 180 s after the first qualifying tick | about 360 s (flame gate): red |
+  | Exit while the flame burns, then flow 3.0 C over again | re-entry 60 s later | the lock holds the margin rule, and the fail-safe re-enters at 30 s: red |
+  | Request at the maximum within 60 s of the first flame-on | PWM ends on that tick | waits for the 60 s start gate: red |
+  | Flow 3.0 C over for 60 s from a clean continuous state | switches | switches: control, green on both |
+
+  The last row is a control. It shows that the rule still works; it does not tell the old code from the new.
 
 - **Host test `tests/test_sat_pwm_first_start.py`**, inverted. An OFF to ON heating start stays in continuous for every requested control mode. Red on origin/dev.
 - **End-of-cycle verdict**, `tests/test_sat_cycle_classifier.py`. A continuous cycle with p90 = 2.5 C does not enable PWM; one with 3.0 C does.
 - **Replay before the code** (plan phase 1). `_replay_tools` on the gruijter run (30.8 h) and the indigo run (25 h): mode switches counted for the current firmware and for option A.
 - **Cleanup cases.** `tests/test_sat_pwm_on_freeze.py` becomes "an exit and a re-entry in one flame start a fresh ON time". `tests/test_sat_pwm_anchors.py` and `tests/test_sat_pwm_frozen_flow_dhw.py` check that a draw during an ON phase does not stop the ON clock. `tests/test_sat_cold_cut_min_burn.py` checks that a cold cutoff ends PWM at once, while the band still waits 180 s. Each is red on origin/dev.
+- **Restart.** `tests/test_sat_loop_integration.py` (the whole loop): a restart with a saved PWM flag and an unknown flow sends the continuous setpoint and the entry-348 sequence until the first update with the heater on, then enters PWM. On origin/dev the restore waits in `satRestoreDeferredStep()`, so the first PWM phase comes at a different time: red.
 - **Bench.** A SAT simulation shows a heating start in continuous, and PWM only after a held 3.0 C overshoot.
 
 ## Alternatives Considered
@@ -220,8 +233,28 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
 
 ## Open Questions
 
-- [ ] Entry 518 quotes Robert's order as the coordinator relayed it (coordinator chat, no Discord link). Robert confirms the quote at acceptance (Evidence gate).
-- [ ] Entries 158 and 211 (the 180 s hold after a draw): the implementer of step 3d states per entry what stays as thermo-nova (`pwm.py:144-146`, `:200-202`) and what goes, before the code lands.
+- [ ] Entry 518 quotes Robert's order as the coordinator relayed it. Its sources are the coordinator chat of 08:27 (no id), Robert's DM 1576139651272409151, and #dev-sat-mqtt 1576138809484116152 (the 3d scope, entry 519). Robert confirms the quote at acceptance (Evidence gate).
+
+## Mapping to the rule list Robert answered
+
+Entry 519 uses the numbers of BlueFlame's post of 07:30 UTC (#dev-sat-mqtt 1576138193076621423 and 1576138217046933636, read in this session).
+
+| Post rule | Clause here |
+|---|---|
+| 1 start in PWM and the 60 s start gate | Decision 1, 5 |
+| 2 flame-out fail-safe | Decision 5 |
+| 3 one PWM entry per flame | Decision 5; the Must on re-entry |
+| 4a manual mode command | Decision 8 (ignored with a log line, removed later) |
+| 4b OFF state | Must (stays) |
+| 5 MsgID 3 veto | Decision 8 |
+| 6 kept PWM ON time | Decision 8 |
+| 7 hot-water pause of the PWM clock | Decision 8 (confirmed in `climate.py`, entry 520) |
+| 8 180 s cold cut-off delay | Decision 8 |
+| 9 restart restore with deferral | Decision 7 |
+| 10 margin 2.0 C as a setting | Decision 2 |
+| 11 underheat exit with extra gates | Decision 3, 5 |
+| 12 end-of-cycle verdict margin | Decision 4 |
+| 13-16 band, MM, heating-failure window, self-tune | unchanged (Decision 8, "Kept despite the cleanup") |
 
 ## Superseded and overturned
 
@@ -229,7 +262,7 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
 
 | ADR | Effect | Part |
 |---|---|---|
-| ADR-252 | superseded in full | the start in PWM and the start gate; its restore clause is kept as entry 121 |
+| ADR-252 | superseded in full | the start in PWM, the start gate and the deferred restore (replaced by the plain restore of Decision 7) |
 | ADR-249 | partly superseded | the switch margin as a setting, and the fail-safe it kept |
 | ADR-254 | partly superseded | the 2.0 C / 60 s margin and its migration, the 3.0 C / 30 s fail-safe, the per-flame lock (entry 429) |
 | ADR-236 | partly superseded | only the line "the start gate of ADR-252 stays"; its 3.0 C / 180 s rule and its gates stay |
@@ -256,7 +289,9 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
 | 475, 476, 478, 479 | the kept PWM ON time and the minimum burn across flips (rule 6; 477 is the KD change and is not touched) | body (Settled line) |
 | 95 (hot-water part), 103, 132 | the hot-water pause and resume of the PWM ON clock (rule 7) | body (Settled line) |
 | 105, 106, 107, 234 | the hold of a PWM ON start while a hot-water flame burns, and its counting; thermo-nova has no such hold (`pwm.py:154-177`), so they go with rule 7 | body (Settled line); entry 105 itself names it a deviation from `pwm.py:160` |
-| 158, 211 | the 180 s hold after a draw; thermo-nova times the hold from the flame-on its ON phase sees (`pwm.py:144-146`, `:200-202`). The implementer keeps what matches that and drops the draw-specific parts | body (Settled line) |
+| 158, 211 | their draw-specific parts (the hold frozen through a draw, the lapse rule); the hold itself follows `pwm.py:144-146`, `:200-202` (a Must) | body |
+| 121, 462 | NOT overturned. 121: quiet until valid data, then the flag is restored. 462: only the flag returns, and the phase starts fresh. Both agree with the plain restore | body |
+| ADR-252 restore clause; the deferral parts of entries 213 and 215 (already reversed by 392 and 393) | the deferral of the restore | ADR body; entries by heading |
 | 275 | for the cold cutoff only: the cutoff no longer waits 180 s (rule 8). For the band it stays (entry 376, ADR-250) | body (Settled line) |
 | 31, 80, 260 | NOT overturned: the 180 s minimum flame-on in an ON phase (`pwm.py:200-202`) and "no PWM schedule while the cold cutoff holds" (HC:229-234) are thermo-nova's own | body (Settled line) |
 
@@ -269,9 +304,9 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
 ## References
 
 - **thermo-nova 7beaaf5** (https://github.com/Alexwijn/SAT/tree/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb/custom_components/sat), local copy `other-projects/SAT-releases-thermo-nova` (HEAD verified as 7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb):
-  - `heating_control.py:64-72`, `:167`, `:181-190`, `:197-240`, `:262-305`, `:307-378`;
+  - `heating_control.py:64-72`, `:147-152`, `:167`, `:181-190`, `:197-240`, `:262-305`, `:307-378`;
   - `pwm.py:87-115`, `:144-146`, `:154-214`, `:219-227`, `:248`;
-  - `climate.py:169-176`, `:461-464`, `:544-545`, `:583`, `:660`;
+  - `climate.py:169-176`, `:461-464`, `:544-545`, `:583`, `:604-615`, `:660`;
   - `cycles/const.py:10-11`, `cycles/classifier.py:74-75`;
   - `const.py:19-23`, `:34`.
 - **Firmware at origin/dev 32761e62a:**
