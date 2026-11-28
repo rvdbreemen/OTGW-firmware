@@ -78,6 +78,13 @@ The margin of the continuous-to-PWM rule of ADR-305 is the user setting `satpwms
   - An alias would be a second way in to the same margin, which is what Robert objected to.
   - Few automations can depend on it. The MQTT command `overshoot_margin` has been on the dev line since 2026-04-05 (commit 4d482ab53, `git log -S`), but the 2.x line has been public only through betas since 2026-11-01, run by a small group of testers. The coordinator gave the reason as "from the recent 2.0.0 betas (TASK-1485 era)". The git history shows the command is older than that; the small number of 2.x users is what carries the argument.
   - If Robert asks for an alias, this ADR changes.
+- **Clarification of ADR-305 Decision 7 and its restore Must** (reported by the coordinator at 10:10 from the test author's run, not seen by otgw-architect).
+  - What ADR-305 says: after a restart, "IDLE with the continuous setpoint and the entry-348 sequence" until the first update with the heater on.
+  - What the code does: the restored flag puts SAT in PWM mode with the plain request until the first tick (CS=39.9 at 60000 ms, MM=0). On that first tick, a heater that is off ends PWM and clears the flag.
+  - That matches thermo-nova on the wire. With PWM enabled and the status IDLE, thermo-nova is in CONTINUOUS control mode (HC:147-152). Its continuous setpoint is the request while the boiler temperature is unknown or at or below the request (HC:458-474). Its modulation state is OFF because PWM is enabled (HC:139-140), so MM is 0 (HC:517-518).
+  - So the boiler sees the plain request with MM 0 in both, and the entry-348 start-up sequence does not run in that window.
+  - ADR-305's wording is corrected here. Its Must reads: until the first update with the heater on, SAT sends the plain request with MM 0, and a heater that is off at that tick clears the flag.
+  - This brings back the boot case that ADR-252 recorded: the boiler can light on the plain request without the flame-off hold. That is thermo-nova's behaviour. It falls under the cold-start risk that Robert accepted for ADR-305 (DM 1576143352036982909).
 - **Register.** Entry 523 (OTGW-sat-decisions main ec2c041) records the verdict and migration decisions of the coordinator. It supersedes the part of entry 522 that reads "verdict + underheat stay 3.0" for the verdict. Entry 522 stands for the setting with default 3.0, and for the underheat exit.
 - **The underheat exit stays fixed:** requested - 3.0 C for 180 s (ADR-305 Decision 3, `cycles/const.py:11`). The 60 s hold and the 300 s saturation exit also stay as ADR-305 has them.
 - **One-time migration to 3.0** (decided by the coordinator, 09:02; reversible; Robert is told; register entry 523).
