@@ -216,6 +216,18 @@ static bool satDhwGuardActive(uint32_t tickMs)
          (_sustain_dhwSeen && (uint32_t)(tickMs - _sustain_dhwEndMs) < SAT_DHW_OVERSHOOT_GUARD_MS);
 }
 
+// thermo-nova HeatingDemand.heater_state == ON (heating_control.py:64-72) and a request above the cold setpoint (:281-283 for the
+// switch, :317-319 for the exits): the valves are open, there is no summer-simmer pause (the firmware's own heater-off path) and the
+// requested setpoint is above the cold threshold, the per-system cold setpoint plus its hysteresis (ADR-199; thermo-nova's fixed 22).
+// Both sustained rules ask it themselves (TASK-3151.1, Robert 2026-11-28), so they hold whoever calls them. hvac_mode OFF has no
+// counterpart: SAT off, a trip and an OpenTherm loss are the OFF control mode, which both rules refuse.
+static bool satHeatingDemandOn(float requestedSetpoint)
+{
+  if (!state.sat.bValvesOpen) return false;
+  if (state.sat.bSummerActive && settings.sat.bSummerSimmer) return false;
+  return requestedSetpoint > satColdThreshold();
+}
+
 // --- EMA Fractions (lightweight sliding window) ---
 static float _ema_dutyRatio       = 0.0f;  // fraction of time flame is on
 static float _ema_overshootFrac   = 0.0f;  // fraction of cycles with overshoot
@@ -1336,7 +1348,9 @@ void satNoteSlaveConfig(uint8_t hb)
 // one-PWM-entry-per-flame rule are gone.
 bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 {
-  if (state.sat.eControlMode != SAT_MODE_CONTINUOUS || satDhwGuardActive(tickMs)) {
+  // thermo-nova's guards (heating_control.py:264-286): PWM not on yet (:264-266), no hot water now or within 300 s (:268-274), the
+  // heater ON with a request above the cold setpoint (:276-283); a failing tick clears the start. A missing flow follows below.
+  if (state.sat.eControlMode != SAT_MODE_CONTINUOUS || satDhwGuardActive(tickMs) || !satHeatingDemandOn(requestedSetpoint)) {
     _sustain_overshootRunning = false;
     return false;
   }
@@ -1380,7 +1394,10 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 // TASK-3151.2 (ADR-305): no start gate; a heating start runs in continuous and both exits count from the first valid tick.
 bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
 {
-  if (state.sat.eControlMode != SAT_MODE_PWM || satDhwGuardActive(tickMs) || !state.sat.bPwmFlameRequested) {
+  // thermo-nova's guards (heating_control.py:307-328): PWM on (:308-311), no hot water now or within 300 s (:313-315), the heater
+  // ON with a request above the cold setpoint (:317-319), PWM in its ON phase (:321-323); a failing tick clears both starts.
+  if (state.sat.eControlMode != SAT_MODE_PWM || satDhwGuardActive(tickMs) || !satHeatingDemandOn(requestedSetpoint) ||
+      !state.sat.bPwmFlameRequested) {
     _sustain_underheatRunning = false;
     _sustain_saturationRunning = false;
     return false;
