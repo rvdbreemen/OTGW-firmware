@@ -288,4 +288,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-302 | Accepted | - | Remote telemetry ships in the normal esp32-combo build as an experimental, opt-in feature on boards with PSRAM only. |
 | ADR-303 | Proposed | - | BLE child-device entities (temperature, humidity, battery and signal strength of each probe) carry, next to the gatew... |
 | ADR-304 | Rejected | - | The first public beta with remote telemetry also carries the ADR-298 guards and the new partition table, in one relea... |
-| ADR-305 | Proposed | `src/**/*.py` | State one concrete chosen approach and its rationale. |
+| ADR-305 | Accepted | - | SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. |

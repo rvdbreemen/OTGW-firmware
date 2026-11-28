@@ -1,7 +1,7 @@
 ---
 id: "ADR-305"
 title: "SAT mode switching, exits and the end-of-cycle verdict follow thermo-nova: start in continuous, PWM after 3.0 C over for 60 s, no fail-safe and no start gate"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-28"
 binding: false
 gate: null
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "sat"
   - "pwm"
@@ -29,6 +28,7 @@ symbols:
   - "satPwmFirstStart"
   - "satStartGateActive"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -37,7 +37,9 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-28. Guideline-level (ADR-080) with a test gate: `tests/test_sat_overshoot_sustain.py` and `tests/test_sat_pwm_first_start.py` (see Verification). On acceptance it supersedes ADR-252 and ADR-296 and partly supersedes ADR-249, ADR-254, ADR-236, ADR-297 and ADR-251; the frontmatter `supersedes` field and the README lines of those ADRs are set then, not while Proposed.
+Accepted, 2026-11-28.
+
+Guideline-level (ADR-080) with a test gate: `tests/test_sat_overshoot_sustain.py` and `tests/test_sat_pwm_first_start.py` (see Verification). It replaces ADR-252 and ADR-296 in full, and parts of ADR-249, ADR-254, ADR-236, ADR-297 and ADR-251 (see the table). The README lines of those ADRs point here; the old ADRs themselves are not edited.
 
 ## Status History
 
@@ -48,11 +50,16 @@ status_history:
     changed_by: "Agent: Claude (otgw-architect)"
     reason: "Initial proposal. Decision maker: Robert van den Breemen (entries 518 and 519; entry 518 relayed by the coordinator, not seen by otgw-architect). Sergeant D answered A and No rules to keep (entries 517, 520). Robert accepts."
     changed_via: adr-kit
+  - date: 2026-11-28
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision, DM 1576143352036982909), recorded by Agent: Claude (otgw-architect)"
+    reason: "Accepted: decision Robert van den Breemen, Discord DM 1576143352036982909 (2026-11-28 07:50:58 UTC), reply to DM 1576142522735132754 which named ADR-305 and commit d302a446f: \"A. Overshoot in cold start is acceptable .\" Recorded by Agent: Claude (otgw-architect); DM read back by otgw-architect."
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-SAT (Smart Autotune Thermostat) runs the boiler in one of two control modes. In **continuous** the boiler modulates on a setpoint. In **PWM** (pulse-width modulation) SAT switches the burner on and off in timed phases with the modulation held low. Terms used below: CH (central heating, the CH-enable bit SAT sends), API (the REST and MQTT interfaces), DM (Discord direct message), EN and NL (the English and Dutch manuals).
+SAT (Smart Autotune Thermostat) runs the boiler in one of two control modes. In **continuous** the boiler modulates on a setpoint. In **PWM** (pulse-width modulation) SAT switches the burner on and off in timed phases with the modulation held low. Terms used below: CH (central heating, the CH-enable bit SAT sends), API (application programming interface: here the REST (Representational State Transfer) and MQTT (Message Queuing Telemetry Transport) interfaces), DM (Discord direct message), EN and NL (the English and Dutch manuals), UTC (Coordinated Universal Time), HVAC (heating, ventilation and air conditioning, the Home Assistant climate mode), OTGW (OpenTherm Gateway), and the thermo-nova state names IDLE (the PWM idle status), OFF (the PWM off phase) and HEAT (the heat mode).
 
 Over the past weeks the firmware gained rules on top of thermo-nova, the pinned SAT reference (`custom_components/sat` at 7beaaf5, ADR-196):
 
@@ -140,7 +147,7 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
 **Kept despite the cleanup** (not extra mode rules; entry 520 is read as not covering them, interpretation ours):
 
 - The tolerance band's 180 s minimum burn (entries 275 and 376, ADR-250). The cold cutoff and the band share `satPwmColdCutWaitsForMinBurn()` today. The implementer keeps the band's use when the cold cutoff stops using it.
-- The hourly start limit, MM (TASK-3143), the heating-failure window and the self-tune.
+- The hourly start limit, MM (task 3143), the heating-failure window and the self-tune.
 
 ## Decision Contract
 
@@ -222,6 +229,8 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
   - (2) A short warm-up for the boiler components, which means less thermal stress. This reason is given up.
 
   Mitigation: the start-up setpoint sequence of entry 348 stays. The bench and the replay look at the first minutes of a cold start.
+
+  **Accepted by the maintainer.** Robert accepted this risk when he accepted the ADR: "A. Overshoot in cold start is acceptable ." (DM 1576143352036982909). A cold-start overshoot is the expected result of this ADR. Tests and bench runs do not reopen it as a defect; they only record it.
 - **The underheat exit can fire early.** Without the 180 s flame gate it can come about 180 s after ignition, while the flow is still cold (the reason for entry 456). Mitigation: saturation and underheat both come from thermo-nova, and the replay counts these exits.
 - **A target step can still push the duty to 1.00 and saturate.** Thermo-nova does that too (plan section 4). Mitigation: option C stays open.
 - **API.** `satpwmswitchmargin` (REST, MQTT `sat/pwm_switch_margin`, settings) loses its effect or goes away. Home Assistant automations that set it see no effect.
@@ -233,7 +242,7 @@ SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does. The 
 
 ## Open Questions
 
-- [ ] Entry 518 quotes Robert's order as the coordinator relayed it. Its sources are the coordinator chat of 08:27 (no id), Robert's DM 1576139651272409151, and #dev-sat-mqtt 1576138809484116152 (the 3d scope, entry 519). Robert confirms the quote at acceptance (Evidence gate).
+- [x] Entry 518 quotes Robert's order as the coordinator relayed it. Its sources are the coordinator chat of 08:27 (no id), Robert's DM 1576139651272409151, and #dev-sat-mqtt 1576138809484116152 (the 3d scope, entry 519). Robert confirms the quote at acceptance (Evidence gate). — **Answered 2026-11-28 by Agent: Claude (otgw-architect):** Robert accepted ADR-305 with this point listed as open in the question (DM 1576142522735132754 named the three sources: his chat of 08:27, his DM 1576139651272409151 and #dev-sat-mqtt 1576138809484116152); his answer DM 1576143352036982909: "A. Overshoot in cold start is acceptable ." Interpretation (ours): accepting with the point named confirms the relayed quote of entry 518.
 
 ## Mapping to the rule list Robert answered
 
@@ -290,10 +299,10 @@ Entry 519 uses the numbers of BlueFlame's post of 07:30 UTC (#dev-sat-mqtt 15761
 | 95 (hot-water part), 103, 132 | the hot-water pause and resume of the PWM ON clock (rule 7) | body (Settled line) |
 | 105, 106, 107, 234 | the hold of a PWM ON start while a hot-water flame burns, and its counting; thermo-nova has no such hold (`pwm.py:154-177`), so they go with rule 7 | body (Settled line); entry 105 itself names it a deviation from `pwm.py:160` |
 | 158, 211 | their draw-specific parts (the hold frozen through a draw, the lapse rule); the hold itself follows `pwm.py:144-146`, `:200-202` (a Must) | body |
-| 121, 462 | NOT overturned. 121: quiet until valid data, then the flag is restored. 462: only the flag returns, and the phase starts fresh. Both agree with the plain restore | body |
+| 121, 462 | not overturned. 121: quiet until valid data, then the flag is restored. 462: only the flag returns, and the phase starts fresh. Both agree with the plain restore | body |
 | ADR-252 restore clause; the deferral parts of entries 213 and 215 (already reversed by 392 and 393) | the deferral of the restore | ADR body; entries by heading |
 | 275 | for the cold cutoff only: the cutoff no longer waits 180 s (rule 8). For the band it stays (entry 376, ADR-250) | body (Settled line) |
-| 31, 80, 260 | NOT overturned: the 180 s minimum flame-on in an ON phase (`pwm.py:200-202`) and "no PWM schedule while the cold cutoff holds" (HC:229-234) are thermo-nova's own | body (Settled line) |
+| 31, 80, 260 | not overturned: the 180 s minimum flame-on in an ON phase (`pwm.py:200-202`) and "no PWM schedule while the cold cutoff holds" (HC:229-234) are thermo-nova's own | body (Settled line) |
 
 ## Related Decisions
 
@@ -303,7 +312,7 @@ Entry 519 uses the numbers of BlueFlame's post of 07:30 UTC (#dev-sat-mqtt 15761
 
 ## References
 
-- **thermo-nova 7beaaf5** (https://github.com/Alexwijn/SAT/tree/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb/custom_components/sat), local copy `other-projects/SAT-releases-thermo-nova` (HEAD verified as 7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb):
+- **thermo-nova 7beaaf5** (https://github.com/Alexwijn/SAT/tree/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb/custom_components/sat), local copy `other-projects/SAT-releases-thermo-nova` (head commit verified as 7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb):
   - `heating_control.py:64-72`, `:147-152`, `:167`, `:181-190`, `:197-240`, `:262-305`, `:307-378`;
   - `pwm.py:87-115`, `:144-146`, `:154-214`, `:219-227`, `:248`;
   - `climate.py:169-176`, `:461-464`, `:544-545`, `:583`, `:604-615`, `:660`;

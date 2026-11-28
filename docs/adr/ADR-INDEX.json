@@ -12431,32 +12431,76 @@
       "title": "SAT mode switching, exits and the end-of-cycle verdict follow thermo-nova: start in continuous, PWM after 3.0 C over for 60 s, no fail-safe and no start gate",
       "path": "ADR-305-sat-mode-switching-exits-and-the-end-of-cycle-verdict-follow-thermo-nova-start-in-continuous-pwm-after-3-0-c-over-for-60-s-no-fail-safe-and-no-start-gate.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-28",
-      "decision_summary": "State one concrete chosen approach and its rationale.",
-      "topics": [],
-      "aliases": [],
-      "components": [],
-      "symbols": [],
+      "decision_summary": "SAT decides between continuous and PWM exactly as thermo-nova 7beaaf5 does.",
+      "topics": [
+        "control-mode",
+        "pwm",
+        "sat",
+        "thermo-nova"
+      ],
+      "aliases": [
+        "no flame-out fail-safe",
+        "no start gate",
+        "plain thermo-nova switching",
+        "start in continuous"
+      ],
+      "components": [
+        "SAT control mode switching"
+      ],
+      "symbols": [
+        "satCycleApplyEndOfCycle",
+        "satCycleCheckOvershootSwitch",
+        "satCycleCheckPwmExits",
+        "satPwmFirstStart",
+        "satStartGateActive"
+      ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "State required implementation constraints."
+          "Start every heating start in continuous mode.",
+          "Switch to PWM only in one of two ways:",
+          "flow >= requested + 3.0 C, held 60 s, with thermo-nova's gates;",
+          "a continuous cycle with an OVERSHOOT verdict at a margin of 3.0 C.",
+          "Leave PWM only in one of these ways:",
+          "underheat: flow <= requested - 3.0 C for 180 s, in the PWM ON phase;",
+          "saturation: 300 s without off time;",
+          "a request at or above the maximum setpoint;",
+          "heater off;",
+          "a PWM cycle with an UNDERHEAT verdict.",
+          "Allow a PWM re-entry inside the same flame when rule 2 holds again.",
+          "Count the underheat 180 s from the first qualifying tick in the PWM ON phase, with no wait for the flame's age.",
+          "Reset the PWM ON time on every PWM exit.",
+          "Keep the PWM ON/OFF clock running during a hot-water draw.",
+          "End PWM on the tick the cold cutoff (no heating demand) comes.",
+          "Answer a controlmode write with a log line and no mode change. The OFF state (SAT off, safety trip, lost OpenTherm link; post rule 4b) stays.",
+          "After a restart, restore a saved PWM flag at once, once the boot silence and the entry-121 wait are over. Keep the PWM status IDLE (continuous setpoint) until the first update with the heater on.",
+          "Time the 180 s minimum flame-on hold inside a PWM ON phase exactly as thermo-nova does: from the flame-on that the ON phase sees, also after a timed-out first-flame wait (pwm.py:144-146, :200-202).",
+          "Drop the parts of entries 158 and 211 that are specific to a hot-water draw: the hold is not frozen through a draw, and there is no lapse rule. otgw-poc-dev states per entry, in the step 3d task, which line of the old code maps to which..."
         ],
         "must_not": [
-          "State prohibited implementation choices."
+          "Enter PWM at a heating start, at boot or when SAT is switched on. The only exception is the restore of a saved PWM flag.",
+          "Keep any of these: a start gate, a flame-out fail-safe, a per-flame PWM lock, or a flame-age gate on the underheat exit.",
+          "Use the setting satpwmswitchmargin, or a classifier margin of 2.0, for a mode decision.",
+          "Add a minimum dwell or hysteresis that thermo-nova does not have. If one is wanted, plan option C is a new decision for Robert."
         ],
         "exceptions": [
-          "State explicit exceptions, or None."
+          "The 60 s boot silence of entry 388 still comes first: no mode logic runs before it ends.",
+          "Removing the REST, MQTT and settings field satpwmswitchmargin (plan step 3c) is an API change. It may first ship as an ignored write; that choice is the implementer's, stated in the task."
         ],
         "verification": [
-          "Name the test, command, or source anchor that verifies this decision."
+          "Host test tests/testsatovershootsustain.py, written by otgw-poc-dev. It compiles the real satCycleCheckOvershootSwitch() and satCycleCheckPwmExits(). Every case is red on origin/dev before the change and green after: | Case | Expected af...",
+          "Host test tests/testsatpwmfirststart.py, inverted. An OFF to ON heating start stays in continuous for every requested control mode. Red on origin/dev.",
+          "End-of-cycle verdict, tests/testsatcycleclassifier.py. A continuous cycle with p90 = 2.5 C does not enable PWM; one with 3.0 C does.",
+          "Replay before the code (plan phase 1). replaytools on the gruijter run (30.8 h) and the indigo run (25 h): mode switches counted for the current firmware and for option A.",
+          "Cleanup cases. tests/testsatpwmonfreeze.py becomes \"an exit and a re-entry in one flame start a fresh ON time\". tests/testsatpwmanchors.py and tests/testsatpwmfrozenflowdhw.py check that a draw during an ON phase does not stop the ON clo...",
+          "Restart. tests/testsatloopintegration.py (the whole loop): a restart with a saved PWM flag and an unknown flow sends the continuous setpoint and the entry-348 sequence until the first update with the heater on, then enters PWM. On origin...",
+          "Bench. A SAT simulation shows a heating start in continuous, and PWM only after a held 3.0 C overshoot."
         ]
       },
       "scope": {
-        "path_globs": [
-          "src/**/*.py"
-        ]
+        "path_globs": []
       },
       "metadata": {
         "binding": false,
@@ -20560,6 +20604,72 @@
     {
       "source": "ADR-304",
       "target": "ADR-302",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-236",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-249",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-250",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-251",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-252",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-253",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-254",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-296",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-305",
+      "target": "ADR-297",
       "type": "related",
       "resolved": true
     }
