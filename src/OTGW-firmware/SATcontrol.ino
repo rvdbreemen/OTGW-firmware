@@ -8809,13 +8809,12 @@ static void satControlLoopRun()
   // (heating_control.py:262-305) has no heat-pump case (entry 87, Q45 A).
   // Entry 410 (Q-1887c B): the switch only runs while heating is allowed, as thermo-nova skips it when the heater is not ON
   // (heating_control.py:276-278). A tolerance-band pause (CH off, _sat_tolBandOff set above in this tick) is heating not allowed:
-  // both rules (the margin rule and the 3.0 C fail-safe) are skipped and their starts cleared, so residual heat in a pause
-  // (indigo 2026-11-16 16:00:58, flow 67.3 with flame and CH off) cannot switch to PWM. That the fail-safe (no thermo-nova
-  // counterpart) is covered too: Sergeant D, entry 417 (Q-410a A, 2026-11-18).
+  // the switch rule is skipped and its start cleared, so residual heat in a pause
+  // (indigo 2026-11-16 16:00:58, flow 67.3 with flame and CH off) cannot switch to PWM.
   if (pidOutput > satColdThreshold() && !_sat_tolBandOff) {
     satCycleCheckOvershootSwitch(pidOutput, _sat_tickMs);
   } else {
-    satCycleSkipAutoSwitch();   // requested <= cold setpoint (heating_control.py:280-282) or a band pause clears both starts
+    satCycleSkipAutoSwitch();   // requested <= cold setpoint (heating_control.py:280-282) or a band pause clears the start
   }
 
   // --- PWM schedule, then the PWM -> continuous exits, before the control setpoint ---
