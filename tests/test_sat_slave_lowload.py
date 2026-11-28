@@ -41,7 +41,7 @@ CORE_INO = Path(os.environ.get("OTGW_CORE_INO", FW / "OTGW-Core.ino"))
 SAT_STATE = ("struct SatState { SATControlMode eControlMode = SAT_MODE_OFF; bool bDhwActive = false, bPwmFlameRequested = false;\n"
              "  uint8_t iRequestedControlMode = 0; bool bSafetyTripped = false; bool bSlaveCfgValid = false, bSlaveLowOffDenied = false;\n"
              "  uint32_t iSlaveCfgChangeMs = 0; bool bValvesOpen = true, bSummerActive = false; };")
-SAT_SETTINGS = "struct SatSettings { float fPwmSwitchMargin = 3.0f; bool bSummerSimmer = false; };"
+SAT_SETTINGS = "struct SatSettings { float fPwmSwitchMargin = 3.0f; bool bSummerSimmer = true; };"
 # stub lines of the old permission / gate code; the new code has none of these functions
 DROP = ("satStartGateActive", "satPwmPermitted", "satPwmNoteRefused", "satPwmEntryAllowed", "satCycleCheckLowLoadVeto", "g_allow")
 
@@ -52,7 +52,6 @@ static int strcasecmp_P(const char* a, const char* b) {
   while (*a && tolower((unsigned char)*a) == tolower((unsigned char)*b)) { a++; b++; }
   return tolower((unsigned char)*a) - tolower((unsigned char)*b);
 }
-static float satColdThreshold() { return 20.0f; }   // the request (50) is above the cold setpoint: the overshoot rule is allowed to run
 static bool g_enabled = true;
 static bool satIsEnabled() { return g_enabled; }
 static void satHandleEnabled(const char*) {}
@@ -137,6 +136,8 @@ def build_source():
     stubs = re.sub(r"^struct SatState \{.*\};.*$", SAT_STATE, stubs, flags=re.M)
     stubs = "\n".join(l for l in stubs.split("\n") if not any(d in l for d in DROP))
     stubs = re.sub(r"^static void satSetControlMode\(SATControlMode m\).*$", "", stubs, flags=re.M)   # the real one is cut below
+    if "satColdThreshold()" not in stubs:
+        raise AssertionError("tests/test_sat_overshoot_sustain.py STUBS lost satColdThreshold(); the overshoot rule needs it")
     if "struct SatState { SATControlMode eControlMode = SAT_MODE_OFF" not in stubs or "float fPwmSwitchMargin = 3.0f" not in stubs:
         raise AssertionError("tests/test_sat_overshoot_sustain.py STUBS changed shape; update this harness")
     fn = sustain._fn

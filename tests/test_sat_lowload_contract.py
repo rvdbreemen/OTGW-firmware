@@ -158,13 +158,16 @@ DELEGATED = {
                 "test_dhw_guard_overshoot_exact_window", "test_dhw_guard_inactive_without_a_draw_near_the_millis_wrap",
                 "test_dhw_resets_underheat_and_blocks_it_for_300s", "test_dhw_resets_saturation_and_blocks_it_for_300s"]),
                ("test_sat_overshoot_sustain", "GateHeatPumpSwitch", ["test_heat_pump_overshoot_switches_to_pwm"]),
-               ("test_sat_pwm_anchors", "SatPwmAnchors", ["test_e3_hot_water_flame_inside_on_adds_no_count", "test_f1_draw_in_on_phase_resumes_with_the_remaining_on_time_after_the_ch_relight",
-                "test_f2_no_ch_flame_after_the_draw_resumes_180_s_after_the_draw_end", "test_f4_draw_in_off_phase_keeps_the_off_wait_from_the_switch",
-                "test_h1_no_on_start_while_the_hot_water_flame_burns", "test_k1_a_draw_shorter_than_one_tick_still_marks_its_flame",
-                "test_m3_short_draw_inside_the_hold_keeps_the_rest_of_the_hold",
+               ("test_sat_pwm_anchors", "SatPwmAnchors", ["test_e3_hot_water_flame_inside_on_adds_no_count", "test_f1_a_draw_in_the_on_phase_does_not_move_the_on_end_with_a_relight",
+                "test_f2_a_draw_in_the_on_phase_does_not_move_the_on_end_without_a_relight", "test_f4_draw_in_off_phase_keeps_the_off_wait_from_the_switch",
+                "test_h1_on_start_is_not_held_while_the_hot_water_flame_burns", "test_k1_a_draw_shorter_than_one_tick_changes_nothing",
+                "test_m3_a_short_draw_inside_the_hold_changes_nothing",
                 # TASK-1412.7 AC3: hot-water flame edges and draws never move a phase-owned timer (OFF anchor, ON clock, heat-pump OFF wait)
                 "test_d1_off_wait_ignores_hot_water_flame_offs", "test_n9_hot_water_in_the_off_phase_does_not_move_the_heat_pump_off_wait",
-                "test_f3_flame_still_lit_after_the_draw_resumes_at_once", "test_g4_second_draw_in_the_post_draw_wait_counts_the_180_s_from_the_last_draw_end",
+                "test_f3_a_draw_in_the_on_phase_does_not_move_the_on_end_with_the_flame_lit",
+                # TASK-3151.4: the post-draw wait is gone with the hot-water pause (the g4 case "second draw in the post-draw wait" has no subject any more);
+                # the ignition inside a draw is covered by g1 and g2
+                "test_g1_a_flame_that_lights_during_a_draw_is_the_ignition",
                 "test_d6_relight_inside_on_does_not_restart_the_timer"]),
                # TASK-1412.7 AC1/AC2: the entry cells (startup ramp, setpoint fall, valve/pump step, maximum limit, post-draw heat, real
                # saturation path, no flame/modulation input) and the QD-8 comparison traces on the real continuous clamp
