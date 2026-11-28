@@ -8,13 +8,12 @@ without heating demand PWM is off, so every start begins with PWM disabled) and 
 
 REAL CODE: the whole SATcontrol.ino / SATcycles.ino / SATpid.ino and the PIC command queue, driven by tests/sat_loop_build.py and the
 stub-clock driver tests/sat_loop_driver.inc (see tests/test_sat_loop_integration.py for what is real and what is a stub). This file adds
-six driver commands by text patch of an in-memory copy of the driver (the shared driver file is not edited):
+five driver commands by text patch of an in-memory copy of the driver (the shared driver file is not edited):
   mutecfg 1|0   the boiler stops/starts answering MsgID 3
   noflame 1|0   the burner cannot ignite
   holdflame 1|0 the burner stays lit whatever CS/CH say (a boiler that was already burning when SAT came on)
   burn          the burner is lit at the start of the run, flow 50 C, ready for holdflame
   cmode <m>     the control_mode command (auto, continuous, pwm) through satHandleControlMode()
-  vetostate     the veto record of the PWM entry gate (path, millis) as one STATE line
 The boiler is the integration driver's first-order model, a plausible combi boiler, not a measurement.
 
 What "continuous" shows on the wire in this driver: the MODE event stays 1 and every MM= command is MM=100 (the maximum relative
@@ -62,7 +61,6 @@ def patched_driver():
     else if (!strcmp(cmd, "holdflame")) g_holdFlame = atoi(a) != 0;
     else if (!strcmp(cmd, "burn")) { bo.flame = true; bo.ch = true; bo.cs = 60.0f; bo.flow = 50.0f; bo.flameChangeMs = g_ms; statusFrame(); }
     else if (!strcmp(cmd, "cmode")) { char m[16]; sscanf(line, "%*s %15s", m); satHandleControlMode(m); }
-    else if (!strcmp(cmd, "vetostate")) ev("STATE", "veto path=%u ms=%u valid=%d", (unsigned)state.sat.iPwmVetoPath, (unsigned)state.sat.iPwmVetoMs, (int)state.sat.bSlaveCfgValid);
     else return 2;""")
     return d
 

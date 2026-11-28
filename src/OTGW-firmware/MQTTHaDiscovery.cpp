@@ -868,7 +868,7 @@ const char ha_name_alias_ventilation_system_type[]                           PRO
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
 // ========== Sensor array (400 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 406;  // +1 SAT room_temp_source (id 252, TASK-3015), +1 PIC temperature_reading (faux id 239, TASK-1940), +5 SAT PWM ON-phase telemetry (id 252, TASK-1880), +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
+const uint16_t MQTT_HA_SENSOR_COUNT = 405;  // +1 SAT room_temp_source (id 252, TASK-3015), +1 PIC temperature_reading (faux id 239, TASK-1940), +5 SAT PWM ON-phase telemetry (id 252, TASK-1880), +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1843,10 +1843,10 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 236
     0xFFFF, // id 237
     0xFFFF, // id 238
-    405, // id 239, 1 entry (TASK-1940: OTGWpictempid PIC temperature_reading)
-    404, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
-    403, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
-    401, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
+    404, // id 239, 1 entry (TASK-1940: OTGWpictempid PIC temperature_reading)
+    403, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
+    402, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
+    400, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
     332, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
     284, // id 245, 4 entries
@@ -1856,9 +1856,9 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     313, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
     317, // id 250, 15 entries (TASK-541 PIC settings)
     334, // id 251, 4 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
-    338, // id 252, 43 entries (TASK-3015 room_temp_source; TASK-543 SAT control/PID/cycle/stats; TASK-1276 power/energy; TASK-1506 CH/DHW gas consumption; TASK-1880 PWM phase telemetry)
-    381, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
-    396, // id 254, 5 entries (TASK-543 SAT flame status; TASK-1490 requested_setpoint, curve recommendation, manufacturer, pressure_drop_rate)
+    338, // id 252, 42 entries (TASK-3015 room_temp_source; TASK-543 SAT control/PID/cycle/stats; TASK-1276 power/energy; TASK-1506 CH/DHW gas consumption; TASK-1880 PWM phase telemetry)
+    380, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
+    395, // id 254, 5 entries (TASK-543 SAT flame status; TASK-1490 requested_setpoint, curve recommendation, manufacturer, pressure_drop_rate)
     0xFFFF // id 255
 };
 
