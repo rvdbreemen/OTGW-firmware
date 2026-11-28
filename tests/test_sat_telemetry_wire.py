@@ -157,7 +157,7 @@ int main(int argc, char** argv) {
   FILE* f = fopen(argv[1], "r");
   if (!f) return 2;
   char op; bool prevFlame = false;   // _sat_prevFlameState starts false (SATcontrol.ino:6803)
-  settings.sat.fOvershootMargin = 2.0f;
+  settings.sat.fPwmSwitchMargin = 3.0f;   // the one margin (TASK-3151.3, ADR-305); fOvershootMargin is gone
   state.sat.fFinalSetpoint = 50.0f; _sat_requestedSetpoint = 50.0f; state.sat.fPidOutput = 50.0f;
   while (fscanf(f, " %c", &op) == 1) {
     unsigned long t;
