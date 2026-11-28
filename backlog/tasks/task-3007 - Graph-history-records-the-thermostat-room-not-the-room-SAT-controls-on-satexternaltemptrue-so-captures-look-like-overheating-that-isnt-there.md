@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-21T14:21:00Z'
-updated_date: '2026-11-21T14:55:00Z'
+updated_date: '2026-11-28T11:08:00Z'
 labels:
   - graph
   - sat
@@ -33,4 +33,6 @@ will_85903's capture (OTGW-field-data/will_85903/2026-11-21_upload/, beta.392, s
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-21 (BlueFlame): will_85903 sent openHAB event logs (OTGW-field-data/will_85903/2026-11-21_upload/openhab/, room_sources.csv). OTGW_SATIndoorTemperature (the room SAT regulates on, from his MQTT sensor) vs OTGW_Tr (thermostat): SAT room 0.3-1.1 C lower all day (e.g. 20 Nov 15:00 20.96 vs 21.72; 21 Nov 03:00 18.56 vs 19.62). 20 Nov 13:45-18:55 SAT room 20.54-21.67 against target 21: the afternoon burns were justified; the graph history (thermostat room 21.6-22) made it look like overheating. Confirms this task's premise with a second source. Chart: charts/overview-v2.png, posted to #beta-testing msg 1573713243640430612.
+
+Bench beta.496 2026-11-28: no satRoom graph/history check done (needs SAT active without boiler: waits for Robert's answer to the simulation-window DM). NOT verified, no AC ticked.
 <!-- SECTION:NOTES:END -->
