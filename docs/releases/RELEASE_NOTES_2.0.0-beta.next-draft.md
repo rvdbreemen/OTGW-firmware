@@ -1,13 +1,10 @@
-# OTGW-firmware v2.0.0-beta.NEXT Release Notes (draft skeleton, route B: bridge guards first, telemetry when it lands)
+# OTGW-firmware v2.0.0-beta.NEXT Release Notes (draft skeleton: first SAT beta; the telemetry and table beta is on HOLD)
 
-Not a release yet. Skeleton for the beta after beta.474 (Saturday 28 Nov 20:00 slot, candidate A of the coordinator's plan). Lines marked [BENCH-TBD] are filled from the bench of that build; [verify] lines may not go out as they stand. One line per user-visible change; every claim is checked again at the release commit. Not pushed. No Sergeant D entry numbers and no names in public text. The text about remote telemetry may say nothing stronger than the approved dialog (draft 2, consent version 1).
+Not a release yet. Skeleton for the beta after the Saturday 14:00 beta. Order of Robert, 28 Nov 08:32: SAT changes go first. The next beta after that one is the first SAT beta (simplified continuous/PWM switching, without the flash table). The remote telemetry and flash table beta is on HOLD, with no date. Lines marked [BENCH-TBD] are filled from the bench of that build; [verify] lines may not go out as they stand. One line per user-visible change; every claim is checked again at the release commit. Not pushed. No Sergeant D entry numbers and no names in public text. The text about remote telemetry may say nothing stronger than the approved dialog (draft 2, consent version 1).
 
-## Heads-up: the beta after this one needs a one-time USB flash
+## Heads-up
 
-<!-- Route B (Robert, ADR-304 Rejected): the bridge guards come first and the new flash layout in a LATER beta. This beta carries the guards and no new table: no USB flash is needed for THIS beta. Keep the heads-up until the table beta ships; when it does, replace this section with the migration section kept in the HOLD block below. -->
-
-- **This beta needs no USB flash.** It adds checks to the update page (see "Update safety" below) so that a unit refuses an image for another flash layout.
-- **The beta after this one changes the flash layout** (the firmware slot grows from 2240 KB to 2304 KB, the filesystem shrinks from 768 KB to 704 KB), and every existing unit will need one USB flash with `flash_otgw --migrate`. We will say so again, with the steps, in the notes of that beta and in #beta-testing. Your settings and WiFi login are kept by that tool. Save your settings now: `curl http://<ip>/api/v2/settings -o settings-backup.json`.
+<!-- HOLD since 2026-11-28 08:32 (coordinator, Robert's order): the heads-up "the beta after this one needs a one-time USB flash" is REMOVED from the live notes, because the next beta is the SAT beta without the table. Bring a heads-up back only when the table beta has a date. The migration text stays below, in the HOLD block. -->
 
 <!-- HOLD (use in the notes of the table beta, migration section FIRST):
 ### Breaking change: this beta changes the flash layout. Existing units need one USB flash first.
@@ -37,6 +34,15 @@ Not a release yet. Skeleton for the beta after beta.474 (Saturday 28 Nov 20:00 s
 ### OTGW32 hardware
 
 - **Warning, 3.3 V only:** the DI pad (GPIO 5, the S0 default) and the 1-wire pad (GPIO 4) are 3.3 V inputs and are not 5 V tolerant. Do not connect an S0 meter or sensor that drives them to 5 V or 12 V (reported by the board's hardware owner).
+
+### SAT: mode switching follows thermo-nova [HOLD until shipped]
+
+<!-- HOLD: this block goes out only in the beta that carries steps 3a to 3c of the SAT mode-switching task (Robert, 2026-11-28 08:27: next possible beta). Fill the TASK ids, the build and the numbers from that build; every [BENCH-TBD] is replaced by what was measured, or the line is cut. Public text: no entry numbers, no names. -->
+
+- **SAT starts in continuous mode again and no longer switches back to PWM on its own fail-safe.** Before, every heating start began in PWM, SAT then went to continuous after a few minutes, and a flame-out fail-safe could push it back to PWM. Two long field runs showed about one switch every half hour. Now SAT follows the original design: it starts in continuous, goes to PWM only when the boiler flow stays at least 3.0 C above what SAT asks for during 60 seconds, and leaves PWM when the flow stays 3.0 C below the request for 180 seconds or when PWM has had no off time left for 300 seconds. [TASK ids follow]
+- **What changes for you:** fewer switches between continuous and PWM, so a steadier flow temperature. Your settings are kept, except one: the setting "PWM switch margin" disappears (SAT uses the fixed margin of 3.0 C); a stored value is dropped [verify: what the firmware does with a stored value]. If you used that setting to tune your boiler, check the heating curve of your first day on this beta. [BENCH-TBD: the switch count of the replay of the two recorded field runs on the finished code; one bench run with the SAT simulator, not a real boiler; what happens to a stored margin and to a POST of the old key]
+- **Not changed:** the heating-curve tune, the tolerance band, the maximum modulation rules and the hot-water pause stay as they are.
+- **Not verified yet:** behaviour with a real boiler over a full heating day.
 
 ### SAT, web UI and other changes
 
