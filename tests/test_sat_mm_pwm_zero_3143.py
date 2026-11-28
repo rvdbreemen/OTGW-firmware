@@ -44,11 +44,15 @@ class MmInPwm(unittest.TestCase):
         late_t = [(t, x) for t, x in mm_frames(r, t_pwm) if x == "MM=T"]
         self.assertEqual(late_t, [], "MM=T sent while PWM runs (entry 505): %r" % late_t[:6])
 
-    def test_no_mm_t_on_the_wire_once_pwm_runs_cold_start_at_the_maximum_duty(self):
+    def test_cold_start_stays_continuous_and_sends_the_configured_maximum_never_mm_t(self):
+        # TASK-3151.2 (ADR-305): a heating start runs in continuous, not in PWM, so the cold-start scenario S7 has no PWM stint
+        # (it had the PWM-first start at the maximum duty before). What goes out is the continuous maximum, never MM=T.
         r = L.Run(self.exe, L.S7)
-        t_pwm = self._pwm_start(r)
-        late_t = [(t, x) for t, x in mm_frames(r, t_pwm) if x == "MM=T"]
-        self.assertEqual(late_t, [], "MM=T sent in the PWM-first start (maximum duty, entries 242/243 replaced by 505): %r" % late_t[:6])
+        self.assertEqual([t for t, x in r.kind("MODE") if x == "2"], [], "the cold start entered PWM:
+" + r.dump(limit=25))
+        frames = mm_frames(r)
+        self.assertTrue(frames, "no MM= at all in the cold start")
+        self.assertTrue({x for t, x in frames} <= {"MM=100"}, "unexpected MM in the continuous cold start: %r" % frames[:6])
 
     def test_mm_zero_is_what_a_gas_boiler_gets_in_pwm(self):
         r = L.Run(self.exe, L.S1)
