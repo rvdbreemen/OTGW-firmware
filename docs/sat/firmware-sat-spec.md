@@ -1764,7 +1764,7 @@ elif _pwm_lastOnFlowTemp > 0: effectiveTemp = _pwm_lastOnFlowTemp   (frozen flow
 if effectiveTemp < baseOffset + 1: effectiveTemp = baseOffset + 1                        (:1671)
 dutyRaw = (pidOutput - baseOffset) / (effectiveTemp - baseOffset)                        (:1673-1674)
 duty = min(max(dutyRaw, 0), 1)                                                           (:1675-1676)
-MM release (MM=T) = range 5 and dutyRaw > 1.03                                           (:1729; entries 436, 440)
+MM release (MM=T) = removed (TASK-3143; entries 505, 514); `_pwm_mmRelease` is no longer read by the MM send
 ```
 
 Thresholds, recomputed on every call (SATcontrol.ino:875-877, SATcontrol.ino:904-907):
@@ -1855,7 +1855,7 @@ CH command (SATcontrol.ino:5223): `CH = satChEnableDecide(pidOutput, coldSetpoin
 | `PWM_IGNITION_TIMEOUT_MS` | 180 000 | ms | SATcontrol.ino:812 |
 | Effective temperature filter window `SAT_PWM_BT_FILTER_MS` (TASK-2993, entries 438, 443; was the 180 000 ms ignition timeout until then) | 30 000 | ms | dev 8c929eee2 SATcontrol.ino:1291 |
 | Filter window slack `SAT_PWM_BT_FILTER_SLACK_MS` (keeps the tick 30 s after the ignition inside, entry 443) | 1 000 | ms | dev 8c929eee2 SATcontrol.ino:1294 |
-| MM=T release threshold `SAT_PWM_MM_RELEASE_DUTY`, raw duty before the cap (TASK-2992, entries 436, 440) | 1.03 | - | dev 8c929eee2 SATcontrol.ino:1298 |
+| MM=T release threshold `SAT_PWM_MM_RELEASE_DUTY` (TASK-2992, entries 436, 440; no effect on MM since TASK-3143, entries 505, 514) | 1.03 | - | SATcontrol.ino at lane tip c8d77db78:1242 |
 | Filter weight on the new sample | 0.3 | - | SATcontrol.ino:884 |
 | Effective temperature floor | base + 1 | °C | SATcontrol.ino:867 |
 | `iCyclesPerHour` default / allowed | 3 / 3 or 4 (setter snaps: 2 and lower to 3, 5 and higher to 4; Sergeant D entries 30, 52, 99, TASK-1375) | per hour | SATtypes.h:525, settingStuff.ino:1105 (search result) |
@@ -1910,7 +1910,7 @@ PWM state (SATcontrol.ino:685-696, SATtypes.h:201-203):
 | `state.sat.fPwmDutyCycle` | Last duty value | SATcontrol.ino:737 |
 | `_pwm_effectiveBoilerTemp` | Start-up filter of the boiler temperature BT: seeded with the live flow at the first flame, at the first ignition of an ON phase and at an OFF-to-ON start with the flame already burning; filtered (EMA 0.3/0.7) during the 30 s (plus 1 s slack) after that anchor and used as BT only inside that window (TASK-2993, entries 437, 438, 443); cleared by `satPwmReset()` | dev 8c929eee2 SATcontrol.ino:1662-1666, :1696-1701, :1947 |
 | `_pwm_lastOnFlowTemp` | BT of the last ON-phase tick, frozen for the OFF phase: the OFF duty is (current request - base) / (this - base) (TASK-2993, entries 444, 446, 447); 0 = no ON tick yet (then the live flow); cleared by `satPwmReset()` | dev 8c929eee2 SATcontrol.ino:1230, :1669-1670, :1948 |
-| `_pwm_mmRelease` | MM=T release: range 5 and the raw duty above 1.03 (TASK-2992, entries 436, 440); read by `satPwmAtMaxDuty()` | dev 8c929eee2 SATcontrol.ino:1236, :1240, :1657, :1729, :1951 |
+| `_pwm_mmRelease` | Range 5 with the raw duty above 1.03 (TASK-2992); no longer read by the MM send (TASK-3143), the MM=T of this path is dead code (TASK-3148) | SATcontrol.ino at lane tip c8d77db78:1212, :1551 |
 | `_pwm_flameOnMs` | Ignition anchor of the current ON phase, filter window only. 0 = no ignition in this ON phase (thermo-nova `_flame_on_at is None`). Set at the first ignition of the phase and at an ON start with a burning flame; also set at a first flame that appears after the ignition wait timed out (pwm.py:144-146); cleared at ON to OFF, at an ON start without a flame and by `satPwmReset()` | SATcontrol.ino:807, SATcontrol.ino:943-946, SATcontrol.ino:964, SATcontrol.ino:875, SATcontrol.ino:889, SATcontrol.ino:879, SATcontrol.ino:1150; pwm.py:164, pwm.py:206 |
 | `_pwm_waitingForFlame`, `_pwm_lastUpdateMs` | Ignition wait (180 s from the phase start, then the ON timer runs anyway, no abort) and the one phase anchor, thermo-nova `_last_update`: set at reset, at OFF/IDLE->ON, at the first ignition while waiting and at ON->OFF; the ON time and the off wait count from it | SATcontrol.ino:808, SATcontrol.ino:815, SATcontrol.ino:870, SATcontrol.ino:890, SATcontrol.ino:958-967, SATcontrol.ino:1019-1036; pwm.py:91, :162, :188, :208 |
 | `_pwm_flameOffHoldSetpoint` | Stored flame-off hold | SATcontrol.ino:690, SATcontrol.ino:881 |
