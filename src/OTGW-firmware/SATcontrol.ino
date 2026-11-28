@@ -1203,6 +1203,7 @@ void satGetBoilerStatusName(char* buf, size_t bufLen)
 //=====================================================================
 // PWM state tracking for effective temperature and flame timing
 static float    _pwm_effectiveBoilerTemp    = 0.0f;
+static float    _pwm_lastOnFlowTemp         = 0.0f;  // TASK-2993 (entry 444): the flow the duty used on the last ON-phase tick; 0 = none yet
 static uint32_t _pwm_flameOnMs             = 0;
 static bool     _pwm_waitingForFlame       = false;
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
@@ -1228,11 +1229,11 @@ static bool     _sat_thermalSafeActive      = false; // The thermal safe fallbac
 // Python HEATER_STARTUP_TIMEFRAME 180 s (pwm.py const): the ignition wait at the start of an ON phase before the
 // ON timer runs anyway, the minimum flame-on hold, and the start-up EMA window. Nothing aborts the phase.
 static const uint32_t PWM_IGNITION_TIMEOUT_MS = 180000UL; // 180s ignition timeout
-// TASK-3151.4 (Robert 2026-11-28 "D1 ook nu", ADR-305): the PWM duty uses thermo-nova's held effective on-temperature: seeded from the
-// flow at the first flame, at an ON start with a lit flame and at the first ignition, smoothed by EMA 0.3/0.7 for the first 180 s of
-// each flame-on (HEATER_STARTUP_TIMEFRAME, pwm.py:144-149), then held, in the ON and the OFF phase alike (pwm.py:229-239). It replaces
-// the live-flow duty and the 30 s filter of Sergeant D's entries 437, 438 and 444 (TASK-2993).
-static const uint32_t SAT_PWM_BT_FILTER_MS = 180000UL;
+// TASK-2993 (Sergeant D entry 437; the 30 s start-up filter per entry 438): the PWM duty uses the live flow temperature, except
+// for the first 30 s after the ignition of an ON phase, where the EMA 0.3/0.7 of the flow smooths the light-off (the flow can fall
+// several degrees within 30 s, indigo_light 19 Nov 21:23). thermo-nova filters for 180 s and then holds the value until the next
+// ON phase (pwm.py:144-149, 229-239); that held value pinned the duty at the maximum while the flow rose (indigo 21:27-21:33).
+static const uint32_t SAT_PWM_BT_FILTER_MS = 30000UL;
 // The control ticks run a few ms late or early against the ignition tick (bench .61: +30003 and +30023 ms), so the tick 30 s
 // after the ignition is inside the window only with this slack (TASK-2993, entry 443: the window includes that tick).
 static const uint32_t SAT_PWM_BT_FILTER_SLACK_MS = 1000UL;
@@ -1382,6 +1383,7 @@ static void satPwmBeginOn(bool flame, float boilerTemp, uint32_t onTimeMs, uint3
   state.sat.bPwmFlameRequested = true;
   _pwm_lastUpdateMs = millis();
   satPwmPhaseOpen(onTimeMs, flame && !state.sat.bDhwActive, _pwm_lastUpdateMs);   // TASK-1880 telemetry: per segment, from the real start
+  _pwm_lastOnFlowTemp = 0.0f;   // entries 444, 499: a new ON phase has no stored flow yet; a draw before its first tick leaves the live flow for its OFF phase
   // Entry 398: an ON phase that starts during a band stop (CH held at 0) does not count toward the hourly start limit.
   _pwm_onUncounted = _sat_tolBandOff;
   // Entry 428: with the flame burning, only the first PWM ON start of that flame counts (a re-entry inside a burn does not).
@@ -1449,7 +1451,7 @@ static void satPwmSchedule(float pidOutput)
   // BT is the filtered boiler (flow) temperature, seeded from the live flow at the first flame
   // (pwm.py:130-131), at an ON start with the flame already burning (pwm.py:164-167) and at the
   // first ignition of an ON phase (pwm.py:189-191) and filtered for the start-up window after that
-  // flame-on (pwm.py:148-149); after that window the value is held (D1, TASK-3151.4). A relight inside
+  // flame-on (pwm.py:148-149). TASK-2993 (entries 437, 444): after that window an ON-phase tick uses the live flow, an OFF-phase tick the flow of the last ON tick. A relight inside
   // the same ON phase keeps BT and does not reopen the window (pwm.py:145-146, 206). Before any
   // seed the live flow is used (pwm.py:232). The floor base + 1 exists only against a division by
   // zero or a negative value (pwm.py:235; Sergeant D, docs/sat/sergeant-d-corrections.md entry 1).
@@ -1479,9 +1481,19 @@ static void satPwmSchedule(float pidOutput)
   const bool entry = _pwm_entryPending;
   _pwm_entryPending = false;
   if (_pwm_effectiveBoilerTemp <= 0.0f && flame) _pwm_effectiveBoilerTemp = boilerTemp;
-  // TASK-3151.4 (D1, thermo-nova pwm.py:232): the duty reads the held effective on-temperature, in the ON and the OFF phase; before
-  // any seed it reads the live flow. The held value changes only by the seeds above and the EMA window below.
-  float effectiveTemp = (_pwm_effectiveBoilerTemp > 0.0f) ? _pwm_effectiveBoilerTemp : boilerTemp;
+  // TASK-2993 (entry 437): the live flow, or the start-up EMA inside the 30 s window after this ON phase's ignition.
+  const bool btFiltered = flame && !_pwm_waitingForFlame && _pwm_flameOnMs != 0 &&
+                          (uint32_t)(millis() - _pwm_flameOnMs) <= SAT_PWM_BT_FILTER_MS + SAT_PWM_BT_FILTER_SLACK_MS && _pwm_effectiveBoilerTemp > 0.0f;
+  float effectiveTemp = btFiltered ? _pwm_effectiveBoilerTemp : boilerTemp;
+  // Entry 444 (Sergeant D, Q-438b B): the live flow counts only in the ON phase. In the OFF phase the duty uses the flow of the
+  // last ON tick with the current request, so a cooling flow does not shorten the pause. Before any ON tick the live flow is used.
+  // TASK-3151.4 (Robert 2026-11-28, ADR-305): no hot-water exception. Entry 499 (the stored flow stays the one of the last tick
+  // before a draw) is replaced: the OFF phase uses the flow of the last ON tick, whatever a draw did to it.
+  // thermo-nova (7beaaf5) cannot be moved by a late draw: its held temperature changes by EMA only while the flame is younger than the update
+  // window (pwm.py:144-149) and the duty reads that held value (pwm.py:229-239); ours follows the live flow in ON (entries 437, 444).
+  if (state.sat.bPwmFlameRequested) {
+    _pwm_lastOnFlowTemp = effectiveTemp;
+  } else if (_pwm_lastOnFlowTemp > 0.0f) effectiveTemp = _pwm_lastOnFlowTemp;
   if (effectiveTemp < baseOffset + 1.0f) effectiveTemp = baseOffset + 1.0f;
 
   float duty = (pidOutput - baseOffset) / (effectiveTemp - baseOffset);
@@ -1501,10 +1513,11 @@ static void satPwmSchedule(float pidOutput)
     _pwm_flameOnMs = millis();
   }
 
-  // --- Effective temperature: EMA 0.3/0.7 for SAT_PWM_BT_FILTER_MS (180 s, pwm.py:148-149) after flame-on, then held.
+  // --- Effective temperature: EMA 0.3/0.7 for SAT_PWM_BT_FILTER_MS (30 s, entries 437/438; thermo-nova and entry 1 as resolved
+  // on 2026-10-22: 180 s, pwm.py:148-149) after flame-on. After the window the ON phase uses the live flow (above, entry 444).
   if (flame && !_pwm_waitingForFlame && _pwm_flameOnMs != 0) {
     uint32_t sinceFlamOn = millis() - _pwm_flameOnMs;
-    if (sinceFlamOn <= SAT_PWM_BT_FILTER_MS + SAT_PWM_BT_FILTER_SLACK_MS) {   // <= as thermo-nova pwm.py:148: the control tick 180 s after the ignition is inside
+    if (sinceFlamOn <= SAT_PWM_BT_FILTER_MS + SAT_PWM_BT_FILTER_SLACK_MS) {   // <= as thermo-nova pwm.py:148: at the 30 s control tick the tick 30 s after the ignition is inside
       _pwm_effectiveBoilerTemp = 0.3f * boilerTemp + 0.7f * _pwm_effectiveBoilerTemp;
     }
   }
@@ -1743,6 +1756,7 @@ void satPwmReset()
   _pwm_flameOffHoldSetpoint   = 0.0f;
   _pwm_lastOffTimeMs          = 1;
   _pwm_effectiveBoilerTemp    = 0.0f;   // thermo-nova pwm.reset(): _effective_on_temperature = None (pwm.py:100)
+  _pwm_lastOnFlowTemp         = 0.0f;   // TASK-2993 (entry 444)
   _pwm_idle                   = true;   // pwm.reset(): _status = PWMStatus.IDLE (pwm.py:92)
   _pwm_atMaxDuty              = false;  // TASK-1581
   _pwm_mmRelease              = false;  // TASK-2992
