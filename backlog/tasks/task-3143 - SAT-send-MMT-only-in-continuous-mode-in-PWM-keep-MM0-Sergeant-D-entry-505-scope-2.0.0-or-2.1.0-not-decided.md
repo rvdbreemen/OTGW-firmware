@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-27T21:27:00Z'
-updated_date: '2026-11-27T21:40:00Z'
+updated_date: '2026-11-28T05:57:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -46,4 +46,8 @@ B. Unchanged by this task, on purpose (entry 505, entry 507 'Open'): heat pump, 
 C. Host tests (red on the old code, green on the fix): new tests/test_sat_mm_pwm_zero_3143.py on the loop harness (tests/sat_loop_build.py, which compiles the real control tick): (1) PWM ON phase at the maximum duty range (raw duty above 1.03, the old _pwm_mmRelease): gas boiler sends MM=0 and never MM=T (red now: MM=T); (2) PWM ON phase below the maximum duty and the OFF phase: MM=0 (green now, characterization); (3) continuous mode: configured maximum (100 by default), never T; (4) heat pump and hybrid in PWM at the maximum duty: configured maximum, never 0, never T (entries 21, 113); (5) Geminox in PWM: 10; (6) hot-water draw inside a PWM ON phase: maximum (entry 220); (7) Immergas: TP=11:12=0 then MM=0 in PWM at the maximum duty, no TP=80 / MM=T pair; (8) SAT disable and restart hand-back still send MM=T (entry 47, tests/test_sat_disable_handback.py unchanged and green); (9) cold cutoff: unchanged (MM max restore). Existing tests that assert MM=T at the maximum duty change to MM=0 in the same commit (found by grep on origin/dev: tests/test_sat_pwm_anchors.py, test_sat_pwm_live_flow_duty_2993.py, test_sat_cmd_cache.py, test_sat_telemetry_wire.py, test_sat_requested_vs_transmitted.py, test_sat_loop_integration.py, test_sat_immergas_tp.py, test_sat_command_delivery.py, test_sat_lowload_contract.py, test_sat_cold_cut_min_burn.py: each file is read before it is edited; the hand-back assertions stay). D. Bench (AC5): SAT simulator on a unit, sattick mm column shows no T during a PWM ON phase, matches MM=0 in the PIC command log; the full suite (python scripts/run_tests.py) before the build slot. E. Docs: docs/sat/firmware-sat-spec.md (the MM paragraph), docs/api/MQTT.md (current_modulation), release-notes line: 'SAT no longer sends MM=T during PWM (Sergeant D entry 505)'. Evidence still missing: nothing here was run; the line numbers are from origin/dev 78646cc99.
 
 Entry 508 (Sergeant D, 22:3x UTC, 'My answer is A'): hot water keeps MM at the maximum during a draw (entry 220 stays); the MM change of entry 505 applies to PWM time outside a draw. The test must cover a draw. Still open: heat pump, hybrid and Geminox in PWM; entry 269.
+
+Entry 514 (Q-3143a answered A by Sergeant D, 2026-11-28 05:53 UTC, release 2.0.0; settles the open point of entry 505): in continuous mode SAT keeps sending the configured maximum modulation value; MM=T goes out only at the hand-back (SAT off, lost OpenTherm link, restart), which is satSendRelease() at SATcontrol.ino:882-888 (line 886 sends MM=T), opened in this session; in PWM the MM stays 0 for a gas boiler (entry 505). Host tests only so far; a real unit still has to be benched. Register commit 8462508, gitlink bump 6dae0a482.
+
+Correction to the line above: the MM=T command in satSendRelease() is at SATcontrol.ino:885 (the function starts at :882), not :886.
 <!-- SECTION:NOTES:END -->
