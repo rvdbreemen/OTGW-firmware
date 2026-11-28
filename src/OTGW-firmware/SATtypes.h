@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.480
+**  Version  : v2.0.0-beta.481
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -563,7 +563,6 @@ struct SATSection {
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
   int16_t  iPreSatMaxTSet     = 0;      // TASK-1541: boiler MsgID 57 value before SAT's first SH=, kept until SAT's switch-off restores it (0 = nothing pending); not a user setting
   int16_t  iPreSatDhwSet      = 0;      // TASK-1541: same for MsgID 56 / SW=
-  float    fOvershootMargin   = 2.0f;   // Overshoot seconds and statistics only (entry 37); decides no mode since TASK-3151.3 (ADR-306)
   float    fPwmSwitchMargin   = 3.0f;   // TASK-3151.3, Robert 2026-11-28 + ADR-306: continuous->PWM when flow - requested >= this for 60 s, and the end-of-cycle OVERSHOOT verdict; thermo-nova's 3.0 (cycles/const.py:10)
   float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)

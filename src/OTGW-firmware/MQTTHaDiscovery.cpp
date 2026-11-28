@@ -312,7 +312,6 @@ DECLARE_SAT_DISCOVERY_STRINGS(sat_pwm_duty,               "sat/pwm_duty",       
 DECLARE_SAT_DISCOVERY_STRINGS(sat_duty_ratio,             "sat/duty_ratio",                    "SAT_Duty_Ratio")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_overshoot_fraction,     "sat/overshoot_fraction",            "SAT_Overshoot_Fraction")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_cycle_phase,            "sat/cycle_phase",                   "SAT_Cycle_Phase")
-DECLARE_SAT_DISCOVERY_STRINGS(sat_overshoot_margin,       "sat/overshoot_margin",              "SAT_Overshoot_Margin")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_cycles_this_hour,       "sat/cycles_this_hour",              "SAT_Cycles_This_Hour")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_cycles,             "sat/4h_cycles",                    "SAT_4H_Cycles")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_avg_on_sec,         "sat/4h_avg_on_sec",                "SAT_4H_Avg_On_Sec")
@@ -1375,7 +1374,6 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {252, 0x00, ha_lbl_sat_cycle_phase,            ha_name_sat_cycle_phase,            HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,             HaIcon::history,         HaEntityCat::none, true, nullptr,                 nullptr},
     // TASK-3015: which room temperature source SAT uses (ble, areas, external, thermostat, simulation, estimate, none)
     {252, 0x00, ha_lbl_sat_room_temp_source,       ha_name_sat_room_temp_source,       HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,             HaIcon::thermometer,     HaEntityCat::diagnostic, true, nullptr,                 nullptr},
-    {252, 0x00, ha_lbl_sat_overshoot_margin,       ha_name_sat_overshoot_margin,       HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::diagnostic, true, nullptr,                 nullptr},
     // measurement, not total_increasing: the value counts starts in the rolling hour and falls as
     // starts leave it, which HA would read as a meter reset on every drop (TASK-1463).
     {252, 0x00, ha_lbl_sat_cycles_this_hour,       ha_name_sat_cycles_this_hour,       HaDeviceClass::none,        HaUnit::none,    HaStateClass::measurement,      HaIcon::counter,         HaEntityCat::none, true, nullptr,                 nullptr},
@@ -3956,6 +3954,7 @@ static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
   { nullptr, nullptr, "/sat/ovp_value" },   // RETIRED-SAT-ENTITY TASK-1460: retained value topic, no entity
   { nullptr, nullptr, "/sat/auto_gains_value" },   // RETIRED-SAT-ENTITY TASK-1357: retained value topic, no entity
   { nullptr, nullptr, "/sat/ssi" },   // RETIRED-SAT-ENTITY TASK-1485: duplicate of sat/summer_simmer_index, no entity
+  { "sensor", "sat_sat_overshoot_margin", "/sat/overshoot_margin" },   // RETIRED-SAT-ENTITY TASK-3151.3: one overshoot margin, sat/pwm_switch_margin (Robert 2026-11-28)
   { "switch", "sat_auto_tune_enable", "/sat/auto_tune_enable" },   // RETIRED-SAT-ENTITY TASK-1413: hourly coefficient auto-tune removed (entry 72)
   { nullptr, nullptr, "/sat/auto_tune" },   // RETIRED-SAT-ENTITY TASK-1413: retained state topic, no entity
   { nullptr, nullptr, "/sat/auto_tune_rate" },   // RETIRED-SAT-ENTITY TASK-1413: retained value topic, no entity

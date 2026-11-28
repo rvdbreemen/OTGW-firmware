@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.480
+**  Version  : v2.0.0-beta.481
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1657,8 +1657,6 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       satHandleHeatingMode(val);
       handled = true;
     // Direct updateSetting() calls
-    } else if (strcasecmp_P(settingName, PSTR("overshoot_margin")) == 0) {
-      updateSetting("SATovershootmargin", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("pwm_switch_margin")) == 0) {   // TASK-1888
       updateSetting("SATpwmswitchmargin", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("heating_system")) == 0) {
@@ -2311,7 +2309,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.control_interval"), (uint32_t)settings.sat.iControlInterval);
     je.field(F("settings.sat.use_external_temp"), settings.sat.bUseExternalTemp);
     je.field(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
-    je.field(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
     je.field(F("settings.sat.pwm_switch_margin"), settings.sat.fPwmSwitchMargin);   // TASK-1888
     je.field(F("settings.sat.overshoot_protection"), settings.sat.bOvershootProtection);
     je.field(F("settings.sat.follow_thermostat"), settings.sat.bFollowThermostat);
@@ -4324,8 +4321,6 @@ void sendDeviceSettings()
   addInt(F("satmaxmodulation"), settings.sat.iMaxRelModulation, "i", 0, 100);
   {
     char tmpBuf[8];
-    dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
-    addNum(F("satovershootmargin"), tmpBuf, "f", 0.5f, 5.0f);
     dtostrf(settings.sat.fPwmSwitchMargin, 1, 1, tmpBuf);   // TASK-1888
     addNum(F("satpwmswitchmargin"), tmpBuf, "f", 0.5f, 5.0f);
   }
@@ -4579,7 +4574,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satinterval", "satmanufacturer", "satmaxconsumption", "satmaxsetpoint", "satmaxpressdrop", "satmaxpressure",
   "satminconsumption", "satminpressure",
   "satmodsupdelay", "satmodsupoffset", "satmqttfallback", "satmultiarea", "satmultiareacount",
-  "satovershootmargin", "satovershootprotection", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",
+  "satovershootprotection", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpresethome", "satpresetsleep",  // TASK-1254: activity/home/sleep had GET + dispatch but were POST-blocked
   "satpresetsync", "satpresetsynctopic", "satpushsetpoint", "satpwmswitchmargin",  // TASK-1888
   // TASK-640: PV-surplus setpoint boost settings

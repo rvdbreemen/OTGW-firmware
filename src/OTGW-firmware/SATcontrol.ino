@@ -5231,7 +5231,6 @@ void satSendStatusJSON()
     je.field(F("kd"),                   snap->st.sat.fKd, 6);
     je.field(F("raw_derivative"),       snap->st.sat.fRawDerivative);
     je.field(F("coefficient"),          settings.sat.fHeatingCurveCoeff);
-    je.field(F("overshoot_margin"),     settings.sat.fOvershootMargin);
     je.field(F("pwm_switch_margin"),    settings.sat.fPwmSwitchMargin);   // TASK-1888
     je.field(F("cycle_count"),          snap->st.sat.iCycleCount);
     je.field(F("cycles_this_hour"),     (int32_t)snap->cyclesThisHour);
@@ -5682,7 +5681,7 @@ void satPublishMQTT()
   static SATShadowF s_pwm_duty, s_duty_ratio, s_overshoot_fraction;
   static SATShadowF s_4h_avg_on, s_4h_avg_off, s_4h_avg_flow, s_4h_duty_ratio;
   static SATShadowF s_4h_overshoot, s_4h_underheat, s_4h_delta_p50, s_4h_delta_p90;
-  static SATShadowF s_overshoot_margin, s_pwm_switch_margin, s_room_temp, s_outside_temp;
+  static SATShadowF s_pwm_switch_margin, s_room_temp, s_outside_temp;
   static SATShadowF s_kp, s_ki, s_kd;
   static SATShadowF s_pre_custom_temp, s_pre_activity_temp;
   static SATShadowF s_pv_surplus_w, s_pv_boost_applied_c, s_pv_boost_delta_c;
@@ -5839,7 +5838,6 @@ void satPublishMQTT()
   // ---------------------------------------------------------------------------
   // Overshoot margin, active, temps, gains, safety, flame
   // ---------------------------------------------------------------------------
-  publishIfChangedF(F("sat/overshoot_margin"), settings.sat.fOvershootMargin, s_overshoot_margin, SAT_EPS_TEMP_COARSE, 1, true);
   publishIfChangedF(F("sat/pwm_switch_margin"), settings.sat.fPwmSwitchMargin, s_pwm_switch_margin, SAT_EPS_TEMP_COARSE, 1, true);   // TASK-1888
 
   publishIfChangedF(F("sat/room_temp"),    satGetRoomTemp(),    s_room_temp,    SAT_EPS_TEMP, 1, false);
