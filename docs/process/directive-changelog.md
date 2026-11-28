@@ -15,6 +15,7 @@ lives here.
 | 2026-10-14 | Reuse open source before building your own | CLAUDE.md "Design Principles" |
 | 2026-10-20 | `/implement-next-task` replaces the plan wait with an advisor self-review | CLAUDE.md "Tasks" |
 | 2026-11-21 | SAT ground truth: our implementation plus the recorded decisions of Sergeant D and Robert is leading; Alex Wijn's SAT (`other-projects/SAT-develop/`) is a reference; comparisons for Sergeant D are factual, with pros, cons and a recommendation, and use field data, replays of both implementations, the OpenTherm spec and the low-load application notes | `.claude/rules/sat-ground-truth.md`, AGENT-CORE block |
+| 2026-11-28 | SAT reference: always compare with Alex Wijn's latest 5.x release; the snapshot `other-projects/SAT-develop/` follows that release (5.1.0 = 9c2fad9) instead of `develop`. Robert: "From now on always compare to latest SAT component from Alexwijm 5.x. Sync latest version to other project store." The ranking of ADR-292 is unchanged (register entries 536, 537) | `.claude/rules/sat-ground-truth.md`, AGENTS.md ground-truth block, `other-projects/README.md` |
 | 2026-10-23 | Record every Sergeant D decision first; check SAT decisions against the register | `.claude/rules/sat-ground-truth.md` |
 | 2026-10-24 | Resolve unclear SAT behaviour by questioning Sergeant D step by step | `.claude/rules/sat-ground-truth.md` |
 | 2026-10-24 | Flash over WiFi OTA first, USB only with `--migrate --host` | `docs/guides/agent-build-and-bench.md`, CLAUDE.md summary |
