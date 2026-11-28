@@ -12518,6 +12518,73 @@
       "format": "canonical",
       "status": "Proposed",
       "date": "2026-11-28",
+      "decision_summary": "The margin of the continuous-to-PWM rule of ADR-305 is the user setting satpwmswitchmargin, with a default of 3.0.",
+      "topics": [
+        "control-mode",
+        "pwm",
+        "sat",
+        "settings"
+      ],
+      "aliases": [
+        "overshoot margin setting",
+        "satpwmswitchmargin default 3.0"
+      ],
+      "components": [
+        "SAT control mode switching"
+      ],
+      "symbols": [
+        "fPwmSwitchMargin",
+        "satCycleCheckOvershootSwitch"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Read the continuous-to-PWM margin, the end-of-cycle verdict margin, the classification label margin and the overshoot-seconds margin from settings.sat.fPwmSwitchMargin, with default 3.0.",
+          "Stop writing SATovershootmargin, and ignore an old key on load.",
+          "Keep the key SATpwmswitchmargin, its range 0.5-5.0, the REST field and the MQTT topic.",
+          "Migrate once, under the marker SATpwmmargin3: a stored 1.5 or 2.0 becomes 3.0, and every other value stays."
+        ],
+        "must_not": [
+          "Use the setting for the underheat exit or the saturation exit.",
+          "Keep a second overshoot margin setting.",
+          "Rewrite a stored value other than 1.5 or 2.0, or run the migration a second time."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatovershootsustain.py, on the real satCycleCheckOvershootSwitch(). The red cases run on the code before this ADR (default 2.0):",
+          "at the default, a flow 2.5 C over the request, held 120 s, does not switch (red: it switches today);",
+          "at the default, a flow 3.0 C over the request switches at 60 s;",
+          "with the setting at 2.0, a flow 2.5 C over the request switches at 60 s (control: green on both).",
+          "Verdict. tests/testsatcycleclassifier.py, with the setting at 3.0: a continuous cycle with p90 = 2.5 does not enable PWM; one with p90 = 3.0 does. With the setting at 2.5, the 2.5 cycle enables PWM.",
+          "Migration. tests/testsatpwmmarginmigration.py. Each case is red on the code before this ADR:",
+          "no SATpwmmargin3 marker, stored 2.0: becomes 3.0;",
+          "no marker, stored 1.5: becomes 3.0;",
+          "no marker, stored 2.4: stays 2.4;",
+          "marker present, stored 2.0: stays 2.0 (a user choice made after the migration);",
+          "a fresh settings.ini gives 3.0."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-307",
+      "title": "SAT PWM and mode-switching rules follow Alexwijn SAT 5.1.0 where no recorded decision conflicts: underheat flame gate, enable needs a burning flame (amends ADR-305)",
+      "path": "ADR-307-sat-pwm-and-mode-switching-rules-follow-alexwijn-sat-5-1-0-where-no-recorded-decision-conflicts-underheat-flame-gate-enable-needs-a-burning-flame-amends-adr-305.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-28",
       "decision_summary": "State one concrete chosen approach and its rationale.",
       "topics": [],
       "aliases": [],
@@ -20711,6 +20778,18 @@
     {
       "source": "ADR-305",
       "target": "ADR-297",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-306",
+      "target": "ADR-254",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-306",
+      "target": "ADR-305",
       "type": "related",
       "resolved": true
     }
