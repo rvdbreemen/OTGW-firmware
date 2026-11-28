@@ -1260,7 +1260,7 @@ Topic: `{TopTopic}/set/{UniqueId}/sat/<command>`. Command names are matched case
 | `sat/outdoor_temp` | `"7.5"` | Push external outdoor temperature (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 to 50000) | Push PV surplus power (W) for PV boost |
 | `sat/enabled` | `"true"` / `"false"` (also `"on"` / `"off"`, `"1"` / `"0"`) | Enable / disable SAT |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (or `"1"` / `"2"` / `"0"`) / `"off"` | Set control mode. `"off"` switches SAT off, the same as `sat/enabled` 0. Any other non-numeric value is treated as `"auto"` |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (or `"1"` / `"2"` / `"0"`) / `"off"` | Ignored since this version: SAT chooses between continuous and PWM by itself and the command only writes a log line (so Home Assistant automations that send it do not break). `"off"` still switches SAT off, the same as `sat/enabled` 0 |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Apply a preset; `"none"` clears it |
 | `sat/humidity` | `"58"` (0 to 100) | Push indoor humidity (%) |
 | `sat/weather_lat` | `"52.3702"` (-90 to 90) | Set the weather location latitude; anything but one number in range is ignored. State is retained on `sat/weather_lat` |
@@ -1279,7 +1279,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 
 | Topic suffix | Setting |
 |-------------|---------|
-| `sat/overshoot_margin` | `SATovershootmargin` |
 | `sat/pwm_switch_margin` | `SATpwmswitchmargin` |
 | `sat/heating_system` | `SATsystem` |
 | `sat/manufacturer` | `SATmanufacturer` |

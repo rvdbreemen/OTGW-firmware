@@ -1456,7 +1456,7 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/enabled" -m "tru
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0"
 ```
 
-Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `fireplace_mode`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode` (ignored since this version: SAT switches between continuous and PWM by itself and only writes a log line), `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `pwm_switch_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `fireplace_mode`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Sending `ON` / `OFF` / `true` / `false` / `1` / `0` works for boolean topics. Numeric topics accept the usual decimal representation.
 
@@ -1529,7 +1529,7 @@ The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` and no
 |---|---|---|---|
 | `satmaxsetpoint` | 65.0 | 30-80 C | Global safety ceiling for flow setpoint |
 | `satflameoffoffset` | 18.0 | 0-30 C | PWM ON phase only: while waiting for the flame, the setpoint is return temperature + this offset. Not applied in continuous mode or in the PWM OFF phase |
-| `satovershootmargin` | 2.0 | 0.5-5 C | Overshoot margin: continuous-to-PWM auto-switch (flow above the requested PID setpoint + margin for 60 s) and cycle classification. Units that stored another value keep it |
+| `satpwmswitchmargin` | 3.0 | 0.5-5 C | The one overshoot margin. Continuous to PWM: the flow stays at or above the requested PID setpoint + margin for 60 s. It is also the margin of the cycle class OVERSHOOT at the end of a cycle. A stored 1.5 or 2.0 (the old defaults) is moved once to 3.0; any other value you set stays |
 | `satmodsupdelay` | 20.0 | 0-60 s | Modulation suppression delay |
 | `satmodsupoffset` | 1.0 | 0-5 C | Modulation suppression offset below setpoint |
 | `satflowoffset` | 2.0 | 0-10 C | Continuous mode: max setpoint drop from boiler temp |
@@ -1577,7 +1577,7 @@ Worked examples for a radiator system, coefficient 1.5:
 
 ### 5.6 Control Modes: Continuous and PWM
 
-**Every heating start runs in PWM first.** When heating starts (after a pause, after SAT is switched on, after a restart), SAT begins in PWM with the first phase ON, also when SAT is set to manual continuous, and decides between PWM and continuous only after the flame has burned for 60 s; during those 60 s no switch to continuous happens (ADR-252, Proposed). A start where the flame was already burning when SAT took over is left as it was.
+**Every heating start runs in continuous mode.** When heating starts (after a pause, after SAT is switched on, after a restart), SAT begins in continuous mode, as thermo-nova does. PWM comes only after a held overshoot (see Auto-switch below). There is no start gate and no wait before an exit can fire. After a restart in which PWM was active, SAT comes back in PWM mode: it sends the plain request until its first control tick with a known flow temperature, and that tick starts the PWM ON phase; if the heater is off on that tick, PWM ends and the saved flag is cleared. No start-up sequence runs in that window.
 
 **Continuous mode**: SAT sends the PID output directly as a flow temperature setpoint. The boiler modulates to reach and hold it. Preferred for modern condensing boilers with good modulation range.
 
@@ -1591,12 +1591,12 @@ Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the 
 
 **Modulation (MM=) in PWM mode**: MM=0 in both phases while PWM is enabled. Heat pumps and hybrid systems never get MM=0: they keep the configured maximum modulation (`satmaxrelmod`), in PWM as well. Geminox boilers get MM=10 instead of 0. Exception (TASK-1581, TASK-2992): when the duty, before it is capped at 100 %, is above 1.03, the requested setpoint is clearly above what the boiler delivers. SAT then sends `MM=T`, which hands the maximum modulation back to the boiler (an Immergas gets `TP=11:12=80` first). As soon as the duty is 1.03 or lower, the value above returns. The flame-off offset is no longer added outside the PWM ON hold, so continuous mode sends the PID setpoint while the flame is off.
 
-**Auto-switch**: SAT always monitors boiler behavior using cycle classification (see section 5.11) and switches modes automatically:
+**Auto-switch**: SAT always monitors boiler behavior using cycle classification (see section 5.11) and switches between continuous and PWM by itself, with the same rules as thermo-nova:
 
-- Continuous to PWM: when the flow temperature minus the requested (PID) setpoint stays at or above the switch margin for 60 seconds (ADR-254, Proposed). The margin is the setting `satpwmswitchmargin` (0.5 to 5.0 C), default 2.0 C; a stored old default of 1.5 C moves to 2.0 C once, a value you set yourself stays (Robert, Q-407a). From beta.391 this rule switches to PWM at most once per burn (one flame-on): once SAT has gone from PWM back to continuous while the flame burns, it stays in continuous until the flame goes out. Only the fail-safe can still switch to PWM in that burn: the flow stays 3.0 C or more above the request for 30 s (3.5 C before beta.391). Only the first PWM ON of a burn counts as a start toward the hourly cycle limit; a later PWM ON in the same burn does not (TASK-2913). From beta.377 neither rule, the switch margin nor the fail-safe, runs while a tolerance-band pause holds CH off: leftover heat after hot water then no longer switches SAT to PWM with the burner off (thermo-nova skips its switch when the heater is not on, `heating_control.py:276-282`).
-- PWM to continuous: in a PWM ON phase, when the flame has burned for at least 180 s and the flow temperature stays at least 3.0 C under the requested setpoint for 180 s (thermo-nova's own underheat rule with an added 180 s flame gate: ADR-236 and ADR-297), or after 300 seconds of saturation (unchanged). The earliest underheat exit is about 6 minutes after ignition. On a cold start with a real shortfall, PWM therefore usually ends earlier, after about 5 minutes, through the 300 seconds of saturation (the log says "PWM saturation"): the end state is the same, continuous. The underheat rule mainly catches a request that jumps up in the middle of a burn. At the maximum setpoint PWM ends sooner: when the request is clamped at the maximum, SAT leaves PWM after the 60 s start gate, without waiting for the 180 s flame gate. Not during the first 60 s of a start.
+- Continuous to PWM: when the flow temperature minus the requested (PID) setpoint stays at or above the switch margin for 60 seconds. The margin is the setting `satpwmswitchmargin` (0.5 to 5.0 C), default 3.0 C (thermo-nova has it fixed at 3.0 C); a stored 1.5 C or 2.0 C, the old defaults, moves to 3.0 C once, a value you set yourself stays. Every tick that does not qualify starts the 60 seconds again. The rule does not run during hot water and the 300 seconds after it, nor while heating is not allowed (for example a tolerance-band pause with CH off). It is the only way into PWM during a burn: there is no second fast rule (the flame-out fail-safe is gone) and no limit of one switch per burn, so SAT can enter PWM again in the same burn whenever the rule holds. Only the first PWM ON of a burn counts as a start toward the hourly cycle limit; a later PWM ON in the same burn does not.
+- PWM to continuous: in a PWM ON phase, when the flow temperature stays at least 3.0 C under the requested setpoint for 180 seconds (thermo-nova's own underheat rule, with no flame-age gate), or after 300 seconds of saturation (the PWM off time stays 0). On a cold start with a real shortfall PWM usually ends earlier, after about 5 minutes, through the saturation rule (the log says "PWM saturation"); the end state is the same, continuous. When the request reaches the maximum setpoint, SAT leaves PWM at once. Heating ending also ends PWM. During hot water and the 300 seconds after it the exit timers do not run.
 
-Within one burn (one flame-on) the PWM ON time is one clock (bench-tested once on the SAT simulator, not yet in the field): it counts only PWM time, stands still while SAT is in continuous, continues when SAT switches back to PWM, and starts over when the flame goes out. The minimum burn (180 s, 600 s for a heat pump) counts from the real flame-on of that burn, also across such switches.
+The PWM ON time starts over every time SAT enters PWM and whenever PWM ends (as thermo-nova). Hot water does not pause the PWM clock: a phase change that falls due during a hot-water draw is taken at once. The tolerance band keeps its own wait: while an ON phase's flame has burned less than 180 s since ignition, a band stop waits for the 180 s.
 - The boiler's configuration message (MsgID 3, including "master low-off not allowed") does not block PWM: PWM is allowed from the start on every boiler (ADR-251).
 
 **Tolerance band** (ADR-253, which partly supersedes ADR-250): when the room reaches the target + 0.1 C, SAT sends CH off while PWM keeps its ON/OFF rhythm; a burn in continuous mode still runs at least 180 s first. Heating restarts as soon as the room is below the target + 0.1 C, but only after CH has been off for at least 10 minutes, counted from the moment the band turned CH off. Our readings, to be confirmed by Sergeant D: a band decision while CH was already off (for example a warm room right after a restart) starts no pause, and a lost room temperature ends the pause so the heating curve takes over. PWM ON phases that start during a band pause do not count as starts toward the hourly limit ; if CH is allowed again while such a phase still runs, the phase is counted once at that moment. With zones, eco lets the main room decide and comfort keeps heating while any room is more than 0.1 C below its own target.
@@ -1763,7 +1763,7 @@ SAT tracks flame on/off transitions and classifies each completed heating cycle.
 **Cycle classification:**
 - NORMAL: healthy cycle with appropriate duration and no sustained overshoot.
 - SHORT_CYCLING: cycle shorter than 60 seconds (indicates boiler cannot modulate low enough).
-- OVERSHOOT: flow temperature exceeded setpoint plus overshoot margin for more than 60 seconds.
+- OVERSHOOT: flow temperature exceeded setpoint plus the PWM switch margin (`satpwmswitchmargin`) for more than 60 seconds.
 - UNDERHEAT: flow temperature stayed more than 2 C below setpoint for more than 180 seconds.
 
 Since alpha.31, classification uses **tail-window percentiles** (the last 180 s) rather than the full-cycle P90/P10. A cycle that started with overshoot but corrected itself is no longer flagged OVERSHOOT on the strength of its early peak; the full-cycle P90 is still logged alongside for diagnostics.
@@ -2035,7 +2035,7 @@ Both end at `TT=0` / `TC=0`, at a replacement `TT=` / `TC=`, or by the release r
 
 | HA component | Count | Examples |
 |---|---|---|
-| `number` | ~25 | heating curve coefficient, overshoot margin, control interval, max modulation, flame-off offset, flow offset, modulation-suppression delay/offset, boiler capacity, summer threshold, preset temperatures (comfort/eco/away/sleep/activity/home), min/max pressure, max pressure drop, target temp step |
+| `number` | ~25 | heating curve coefficient, PWM switch margin, control interval, max modulation, flame-off offset, flow offset, modulation-suppression delay/offset, boiler capacity, summer threshold, preset temperatures (comfort/eco/away/sleep/activity/home), min/max pressure, max pressure drop, target temp step |
 | `switch` | 13 | `solar_gain`, `summer_simmer`, `multi_area`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `fireplace_mode`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
 | `select` | 1 | `sat_heating_system` with options `0` (auto), `1` (radiators), `2` (heat pump), `3` (underfloor) |
 
@@ -4890,7 +4890,7 @@ Topic: `{TopTopic}/set/{UniqueId}/sat/<command>`. Command names are matched case
 | `sat/outdoor_temp` | `"7.5"` | Push external outdoor temperature (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 to 50000) | Push PV surplus power (W) for PV boost |
 | `sat/enabled` | `"true"` / `"false"` (also `"on"` / `"off"`, `"1"` / `"0"`) | Enable / disable SAT |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (or `"1"` / `"2"` / `"0"`) / `"off"` | Set control mode. `"off"` switches SAT off, the same as `sat/enabled` 0. Any other non-numeric value is treated as `"auto"` |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (or `"1"` / `"2"` / `"0"`) / `"off"` | Ignored since this version: SAT chooses between continuous and PWM by itself and the command only writes a log line (so Home Assistant automations that send it do not break). `"off"` still switches SAT off, the same as `sat/enabled` 0 |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Apply a preset; `"none"` clears it |
 | `sat/humidity` | `"58"` (0 to 100) | Push indoor humidity (%) |
 | `sat/weather_lat` | `"52.3702"` (-90 to 90) | Set the weather location latitude; anything but one number in range is ignored. State is retained on `sat/weather_lat` |
@@ -4909,7 +4909,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 
 | Topic suffix | Setting |
 |-------------|---------|
-| `sat/overshoot_margin` | `SATovershootmargin` |
 | `sat/pwm_switch_margin` | `SATpwmswitchmargin` |
 | `sat/heating_system` | `SATsystem` |
 | `sat/manufacturer` | `SATmanufacturer` |
@@ -5508,7 +5507,7 @@ Free heap is below 4 KB. The firmware's heap gate blocks new HTTP connections in
 |-------|-------------|
 | `none` | No complete cycle yet observed |
 | `good` | Cycle reached setpoint with acceptable overshoot |
-| `overshoot` | Flow temperature exceeded setpoint + overshoot margin |
+| `overshoot` | Flow temperature exceeded setpoint + the PWM switch margin |
 | `underheat` | Cycle ended before reaching setpoint; demand not met |
 | `short` | Cycle duration too short (below minimum on-time); short cycling |
 | `uncertain` | Insufficient data to classify |

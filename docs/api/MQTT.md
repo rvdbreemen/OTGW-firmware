@@ -330,7 +330,7 @@ SAT topics no longer publish on every control cycle. Each topic under `sat/*` us
 | Constant | Value | Used for |
 |---|---|---|
 | `SAT_EPS_TEMP` | 0.05 °C | `setpoint`, `target`, `room_temp`, `outside_temp` |
-| `SAT_EPS_TEMP_COARSE` | 0.1 °C | `heating_curve`, `overshoot_margin`, `pwm_switch_margin`, `max_setpoint`, `requested_setpoint` |
+| `SAT_EPS_TEMP_COARSE` | 0.1 °C | `heating_curve`, `pwm_switch_margin`, `max_setpoint`, `requested_setpoint` |
 | `SAT_EPS_PID_OUTPUT` | 0.5 °C | `pid_output` (derivative jitter damping) |
 | `SAT_EPS_PID_TERM` | 0.1 °C | `pid_p`, `pid_i`, `pid_d` |
 | `SAT_EPS_ERROR` | 0.05 °C | `error`, `error_mean` |
@@ -353,7 +353,7 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | ----- | ----- | -------- | ----------- |
 | `sat/enabled` | `"true"` / `"false"` | yes | SAT enabled setting, i.e. the user's choice (matches the `sat/enabled` command). Published while SAT is disabled too. It stays `"false"` during an MQTT-loss takeover; `sat/fallback_active` shows that |
 | `sat/mode` | `"off"` / `"continuous"` / `"pwm"` | yes | ACTUAL control mode; always `"off"` while SAT is disabled or tripped. A `sat/control_mode` command in that state only changes `sat/control_mode` |
-| `sat/control_mode` | `"auto"` / `"continuous"` / `"pwm"` | yes | Control mode REQUESTED with the `sat/control_mode` command (`"auto"` after boot until a command arrives). `sat/mode` is the mode in use |
+| `sat/control_mode` | `"auto"` | yes | Always `"auto"`: the `sat/control_mode` command is ignored since this version (SAT chooses between continuous and PWM by itself; the command only writes a log line). `sat/mode` is the mode in use |
 | `sat/preset` | `"none"` / `"away"` / `"eco"` / `"comfort"` / `"sleep"` / `"activity"` / `"home"` | yes | Active preset, same names as the `sat/preset` command (`"none"` = no preset) |
 | `sat/fallback_active` | `"true"` / `"false"` | yes | SAT has taken over because MQTT was lost for more than 5 minutes (opt-in setting `SATmqttfallback`, default off; the takeover lives in state and never changes `sat/enabled` or the saved settings). In practice it reads `"false"` over MQTT: the takeover only runs while MQTT is down and is lifted before the first publish after reconnect. REST `GET /api/v2/sat/status` (`fallback_active`) shows it live |
 | `sat/room_temp_lost` | `"true"` / `"false"` | yes | SAT sees no valid room temperature (no source, stale source, or a value outside -10 to 50 C). SAT keeps heating on the heating curve alone: P, I and D are 0, there is no trip and no time limit. Clears when a valid reading returns, and when SAT is switched off. REST `GET /api/v2/sat/status` (`room_temp_lost`) shows it live |
@@ -372,8 +372,7 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/climate_current` | `"20.8"` | yes | Room temperature on the thermostat card: the temperature SAT regulates on while SAT is enabled, the thermostat room temperature (Tr) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
 | `sat/heating_curve` | `"42.3"` | yes | Heating curve calculated value (°C) |
 | `sat/pid_output` | `"43.1"` | yes | PID output = curve + P + I + D (°C) |
-| `sat/overshoot_margin` | `"2.0"` | yes | Configured overshoot margin (°C), for the cycle classification |
-| `sat/pwm_switch_margin` | `"2.0"` | yes | Continuous to PWM when flow - requested setpoint stays at or above this for 60 s (°C, 0.5-5.0, default 2.0; TASK-1888, TASK-2005, entry 407). A stored old default of 1.5 becomes 2.0 once (Q-407a); a value set by the user stays |
+| `sat/pwm_switch_margin` | `"3.0"` | yes | The one overshoot margin (°C, 0.5-5.0, default 3.0). Continuous to PWM when flow - requested setpoint stays at or above this for 60 s; also the margin of the cycle class OVERSHOOT. A stored old default of 1.5 or 2.0 becomes 3.0 once; a value set by the user stays |
 | `sat/requested_setpoint` | `"43.0"` | no | Requested flow setpoint including the solar offset, clamped to the minimum setpoint and `sat/max_setpoint` (°C) |
 | `sat/max_setpoint` | `"62.0"` | yes | Maximum flow setpoint SAT works with (°C) (TASK-1373): the user's Max flow setpoint (`set/<node>/sat/max_setpoint`) cut into the boiler's MsgID 49 bounds (20 to 80 without them), at most 50 for underfloor, 40 for a heat pump and 65 (the old global ceiling). While the user has not chosen a value: 62 for radiators, 50 for underfloor, 40 for a heat pump. Before TASK-1373 this was the fixed 62 / 45 / 40 table |
 | `sat/modulation_state` | `"OFF"` / `"HOT_WATER"` / `"PWM_OFF"` / `"COLD"` / `"ACTIVE"` | no | Modulation state. `"OFF"` while SAT is not active; `"COLD"` = flow temperature below 22 °C |
@@ -1048,7 +1047,7 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | `sat/indoor_temp` | `"20.8"` | Push external indoor temperature (expires after sensor max age) |
 | `sat/outdoor_temp` | `"8.0"` | Push external outdoor temperature (expires after sensor max age) |
 | `sat/enabled` | `"true"` / `"false"` | Enable or disable SAT controller |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` or `"0"` / `"1"` / `"2"`, or `"off"` | Set control mode; `"off"` switches SAT off (same as `sat/enabled` 0) |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` or `"0"` / `"1"` / `"2"`, or `"off"` | Ignored since this version, except `"off"`: SAT chooses between continuous and PWM by itself and the command only writes a log line. `"off"` switches SAT off (same as `sat/enabled` 0) |
 | `sat/preset` | `"away"` / `"eco"` / `"comfort"` / `"sleep"` / `"activity"` / `"home"` | Activate a named preset |
 
 **Window and Humidity Commands:**
@@ -1146,8 +1145,7 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | ------------ | ----------------- | ----- |
 | `sat/heating_curve_coeff` | `SATcoefficient` | Heating curve coefficient (state echo: `sat/heating_curve_coeff`; the state topic `sat/heating_curve` is the computed curve value). Renamed from `sat/heating_curve` in TASK-1485, no alias: the old command is ignored. The REST setting `POST /api/v2/sat/settings/heating_curve_coeff` uses the same name since TASK-1496 |
 | `sat/interval` | `SATinterval` | Control loop interval (seconds) |
-| `sat/overshoot_margin` | `SATovershootmargin` | Overshoot margin (°C) |
-| `sat/pwm_switch_margin` | `SATpwmswitchmargin` | PWM switch margin (°C) |
+| `sat/pwm_switch_margin` | `SATpwmswitchmargin` | PWM switch margin (°C, default 3.0) |
 | `sat/manufacturer` | `SATmanufacturer` | Boiler manufacturer name |
 | `sat/max_modulation` | `SATmaxmodulation` | Max relative modulation % (0 to 100; 100 = no cap). Caps every `MM=` SAT sends. Home Assistant discovers it as the number entity `SAT Max Relative Modulation` (0 to 100, step 1); the SAT page has a slider for it in the Central Heating Settings card (TASK-1514) |
 | `sat/dhw_setpoint` | `SATdhwsetpoint` | DHW setpoint (°C) |
@@ -1357,7 +1355,6 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 | `sat/duty_ratio` | % | Raw 0-1 value x 100 |
 | `sat/overshoot_fraction` | % | Raw 0-1 value x 100 |
 | `sat/cycle_phase` | - | Cycle phase |
-| `sat/overshoot_margin` | °C | Overshoot margin |
 | `sat/pwm_switch_margin` | °C | PWM switch margin |
 | `sat/cycles_this_hour` | - | `state_class` `measurement` (rolling-hour count, falls as starts leave the hour) |
 | `sat/pwm_last_cmd_on_s`, `sat/pwm_last_ignition_delay_s`, `sat/pwm_last_flame_on_s` | s | Diagnostic; last closed PWM ON phase (TASK-1880) |

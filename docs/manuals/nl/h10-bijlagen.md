@@ -189,7 +189,7 @@ De volgende tabel toont de belangrijkste instellingen met hun standaardwaarden. 
 | `satpresetcomfort` | `21.0` | Comfortvoorinstelling (°C) |
 | `satpreseteco` | `18.0` | Eco-voorinstelling (°C) |
 | `satpresetaway` | `15.0` | Afwezig-voorinstelling (°C) |
-| `satovershootmargin` | `2.0` | Overshoottolerantie (°C) |
+| `satpwmswitchmargin` | `3.0` | PWM-schakelmarge, de ene overshoot-marge (°C) |
 | `satmaxmodulation` | `100` | Maximale modulatie (%) |
 
 ---

@@ -177,14 +177,14 @@ stateDiagram-v2
     CONTINUOUS --> PWM : flow >= req + margin for 60 s
     CONTINUOUS --> PWM : burn classified OVERSHOOT
     CONTINUOUS --> PWM : deferred restore, first MsgID 3 permits
-    CONTINUOUS --> PWM : control_mode pwm, permitted
+    CONTINUOUS --> PWM : sustained overshoot (flow >= request + margin 3.0, 60 s)
     PWM --> CONTINUOUS : req >= effective max
     PWM --> CONTINUOUS : low-load permission withdrawn
     PWM --> CONTINUOUS : underheat 180 s
     PWM --> CONTINUOUS : off_time 0 for 300 s
     PWM --> CONTINUOUS : burn classified UNDERHEAT_PWM
     PWM --> CONTINUOUS : heater off
-    PWM --> CONTINUOUS : control_mode continuous or auto
+    PWM --> CONTINUOUS : underheat 180 s, saturation 300 s, request at the maximum, heating ends
     CONTINUOUS --> OFF : satDisable()
     PWM --> OFF : satDisable()
 ```
@@ -196,7 +196,7 @@ stateDiagram-v2
 | `SAT_MODE_OFF` | SAT not controlling | `ST:54`; set `SCT:3830`, `SCT:5559` |
 | `SAT_MODE_CONTINUOUS` | CS = PID output with asymmetric clamp (`satApplyContinuous`) | `SCT:2293-2319`, `SCT:7256` |
 | `SAT_MODE_PWM` | CS from the PWM ON/OFF schedule (`satApplyPWM`) | `SCT:1588-1624`, `SCT:7252` |
-| `iRequestedControlMode` | what the control_mode command asked: 0 auto, 1 continuous, 2 pwm; not the actual mode | `ST:209-211` |
+| `iRequestedControlMode` | always 0 (auto) since TASK-3151.4: the control_mode command is ignored; not the actual mode | `ST:209-211` |
 | `_sat_pwmRestore` | 0 none, 1 waiting for the first valid MsgID 3, 2 denied | `SCT:3629-3630` |
 | PWM saved flag | `/sat_pwm_state.json` `{"pwm":1}` | `SCT:3591-3619` |
 
@@ -209,10 +209,10 @@ stateDiagram-v2
 | OFF (boot, enabled) | CONTINUOUS, restore pending | saved flag 1, not permitted, `_sat_pwmRestore = 1` | none | `SCT:3637-3638` | entries 121, 213, 215 |
 | CONTINUOUS (restore 1) | PWM | first valid MsgID 3 reply with permission | every loop pass | `SCT:3642-3650`, `:6869` | entries 121, 213, 215 |
 | CONTINUOUS (restore 1) | stays, restore 2 | first valid reply denies | none | `SCT:3651-3653` | |
-| CONTINUOUS | PWM | `requested > satColdThreshold()`, not in the DHW guard, `flow > 0 && flow >= requested + fOvershootMargin` sustained, then `satPwmEntryAllowed(1)` | `SAT_OVERSHOOT_SUSTAIN_MS` 60000; margin default 2.0 (`ST:509`); DHW guard 300000 | `SCT:7220-7224`; `SC:33`, `:37`, `:189-193`, `:1356-1386` | Tasks #42/#43, entries 41, 86, 87, 88, 109, 213; Q43 A, Q46 B, Q47 A |
+| CONTINUOUS | PWM | `requested > satColdThreshold()`, not in the DHW guard, `flow > 0 && flow >= requested + fPwmSwitchMargin` sustained, no permission check (MsgID 3 plays no part, ADR-251); the only way into PWM during a burn (TASK-3151.1) | `SAT_OVERSHOOT_SUSTAIN_MS` 60000; margin default 3.0 (`SATtypes.h:563` at lane tip 88d15d27e, ADR-306); DHW guard 300000 | `SCT:7220-7224`; `SC:33`, `:37`, `:189-193`, `:1356-1386` | Tasks #42/#43, entries 41, 86, 87, 88, 109, 213; Q43 A, Q46 B, Q47 A |
 | CONTINUOUS | PWM | continuous burn ended classified `SAT_CYCLE_OVERSHOOT` and `satPwmEntryAllowed(5)` | none | `SC:991-998` | TASK-1331, entries 15, 18, 36, 37 |
-| any | PWM or CONTINUOUS | `control_mode pwm` while live: `satPwmEntryAllowed(3) ? PWM : CONTINUOUS` | none | `SCT:4107-4111` | entry 213 |
-| any | CONTINUOUS | `control_mode continuous` or `auto` while live | none | `SCT:4104-4106`, `:4112-4114` | TASK-205 |
+| any | (no change) | `control_mode pwm` while live: ignored with a log line (TASK-3151.4, SATcontrol.ino:4583-4588 at lane tip 88d15d27e) | none | `SCT:4583-4588` | ADR-305 decision 8 |
+| any | (no change) | `control_mode continuous` or `auto` while live: ignored with a log line (TASK-3151.4) | none | `SCT:4583-4588` | ADR-305 decision 8 |
 | any | OFF (via enabled 0) | `control_mode off` | none | `SCT:4092-4094` | TASK-1265 |
 | PWM | CONTINUOUS | `pidOutput >= satEffectiveMaxSetpoint()` | none | `SCT:7203-7207` | TASK-1591, entry 256 |
 | PWM | CONTINUOUS | `!satPwmPermitted()` while PWM runs | per tick, before the overshoot check | `SCT:7211`; `SC:1336-1344` | entry 214 |
@@ -275,7 +275,7 @@ Min OFF: heat pump 600 s, else 0 (`SCT:486-489`), applied only in range 5 (`SCT:
 | OFF | stays OFF | `satCycleIsHourLimitReached()`: gas count >= 3 or 4 in 60 min; heat pump never | rolling 60 min | `SCT:1541-1551`; `SC:396-403` | Task #203, entries 59, 81 |
 | OFF | ON (range 5) | duty >= dutyMax, not ON, no DHW flame, not within heat-pump min OFF | min OFF 600 s heat pump | `SCT:1458-1467` | entries 59, 198 |
 | ON | OFF | not synced this tick, no DHW hold, not waiting, min burn passed, `elapsed >= onTime`, `satPwmEndOn()` | min burn max(minOn, 180 s) | `SCT:1508-1526`, `:1233-1243` | entries 91, 92, 197 |
-| ON | ON (clock frozen) | DHW bit during ON: `PwmDhwPhase::Draw`, then `Wait` until CH flame or 180 s after draw end | `PWM_IGNITION_TIMEOUT_MS` 180000 | `SCT:1130`, `:1248-1263`, `:1329-1357`, `:6950`, `:6977` | entries 95, 97, 103, 132, 158, 211 |
+| ON | ON (clock keeps running) | DHW bit during ON: the schedule still runs on the DHW tick, so a phase change that falls due is taken at once (TASK-3151.4; no pause, no wait after the draw) | none | `SCT:8115-8119`, `:8138-8140` (lane tip 88d15d27e) | ADR-305 decision 8; entries 95, 97, 103, 132, 158, 211 are overruled for the pause |
 | any | IDLE | `satPwmReset()`: mode change, `satDisable()`, heater off | none | `SCT:1657-1682`, `:1700`, `:1733`, `:3832` | |
 
 Every ON start is counted once in the hour ring, in `satPwmBeginOn()` (`SCT:1220`, `SC:387-392`).
@@ -422,7 +422,7 @@ Flame source: Statusflags bit 3 (0x08) on a real boiler, `state.sat.bSimFlameOn`
 | `pwmOn` | `state.sat.bPwmFlameRequested` | `SC:1137` | |
 | `onTimeSec` | `satPwmLastOnTimeMs()/1000` | `SC:1125`, `SCT:1743-1745` | |
 | `coldSp` | 21.0 underfloor, else 28.2 | `SC:889`, `SCT:133-134`, `:447-451` | entries 7, 11 |
-| overshoot margin | `fOvershootMargin`, default 2.0, range 0.5 to 5.0 | `ST:509`, `settingStuff.ino:1096` | entries 15, 37 |
+| overshoot margin | `fPwmSwitchMargin` (`SATpwmswitchmargin`), default 3.0, range 0.5 to 5.0; one margin for the switch and the OVERSHOOT class | `SATtypes.h:563`, `settingStuff.ino:1242` (lane tip 88d15d27e) | entries 522, 525; ADR-306 |
 | underheat margin | `SAT_UNDERSHOOT_MARGIN_C` 3.0 | `SC:34` | |
 | `controlSp` | `_cycle_setpointAtStart` | `SC:1139` | Q-PARITY-6 |
 
@@ -456,7 +456,7 @@ flowchart TD
     P6 -- no --> G2[GOOD]
     F -- no --> K1{"ctrlErrKnown"}
     K1 -- no --> U6[UNCERTAIN]
-    K1 -- yes --> K2{"ctrlErrP90 >= fOvershootMargin"}
+    K1 -- yes --> K2{"ctrlErrP90 >= fPwmSwitchMargin"}
     K2 -- yes --> OS[OVERSHOOT]
     K2 -- no --> K3{"ctrlErrP50 <= -3.0"}
     K3 -- no --> G3[GOOD]
@@ -498,7 +498,7 @@ flowchart TD
 | 9 | PWM | SHORT | `pwmOn && durationSec < onTimeSec * 0.8` | 0.8 | `SC:906` | |
 | 10 | PWM | GOOD | otherwise (no OVERSHOOT for PWM) | | `SC:908` | |
 | 11 | continuous | UNCERTAIN | `!ctrlErrKnown` | | `SC:913` | |
-| 12 | continuous | OVERSHOOT | `ctrlErrP90 >= fOvershootMargin` | 2.0 default | `SC:915` | entries 15, 37 |
+| 12 | continuous | OVERSHOOT | `ctrlErrP90 >= fPwmSwitchMargin` | 3.0 default (the same setting as the switch) | `SC:915` | entries 15, 37 |
 | 13 | continuous | UNCERTAIN | `ctrlErrP50 <= -3.0 && effSp < coldSp` | 3.0; 28.2 / 21.0 | `SC:917-920` | |
 | 14 | continuous | UNDERHEAT | `ctrlErrP50 <= -3.0`, not 13 | 3.0 | `SC:917`, `:921` | |
 | 15 | continuous | GOOD | otherwise | | `SC:923` | |
@@ -958,7 +958,7 @@ One ON phase in duty ranges 1-4, flame off at the start, overshoot protection on
 
 **Branch: no flame by t0 + 180 s.** On the first tick with `millis() - t0 >= 180 s`, waiting = false and the ON timer runs from t0 (`SCT:1512-1518`; entry 80, Q35 A); nothing aborts the phase (`SCT:1161-1162`). The same tick falls through to `SCT:1520-1526`: with `_pwm_flameOnMs == 0` there is no minimum-burn block, so when `elapsed >= onTime` the phase ends ON->OFF on that very tick, without a flame. A flame that comes later sets `_pwm_flameOnMs` on its tick without moving `_pwm_lastUpdateMs` (`SCT:1416-1420`); the minimum burn then runs from that tick.
 
-**What cancels it:** `satPwmReset()` on any mode change, `satDisable()`, heater off, or missing flow (`SCT:1657-1682`, `:1700`, `:1733`, `:3832`, `:1383`); the cold cutoff skips the schedule and forces CS = 10 (`SCT:7232`, `:7295-7300`); a DHW pause freezes the ON clock and the hold (M3; entries 95, 103, 132, 158, 211).
+**What cancels it:** `satPwmReset()` on any mode change, `satDisable()`, heater off, or missing flow (`SCT:1657-1682`, `:1700`, `:1733`, `:3832`, `:1383`); the cold cutoff skips the schedule and forces CS = 10 (`SCT:7232`, `:7295-7300`); hot water does not pause the ON clock any more (TASK-3151.4, ADR-305 decision 8).
 
 ### Boot (SAT enabled)
 
