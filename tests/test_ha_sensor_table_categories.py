@@ -29,6 +29,11 @@ SAT_INTERNAL = {"sat_pid_output", "sat_error", "sat_pid_p", "sat_pid_i", "sat_pi
                 "sat_kp", "sat_ki", "sat_kd", "sat_duty_ratio", "sat_overshoot_fraction", "sat_overshoot_margin"}
 
 
+# TASK-3151.3 (Robert 2026-11-28, one overshoot margin): the SAT_Overshoot_Margin row (id 252) left the table; the pinned base still
+# has it. The base is compared without the retired rows, so "rows added, removed or relabelled" still catches every other change.
+RETIRED_ROWS = {"sat_overshoot_margin"}
+
+
 def table(text):
     i = text.index("const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {")
     j = text.index("\n};", i)
@@ -61,7 +66,7 @@ class HaSensorTableCategories(unittest.TestCase):
         cls.fix = table(SRC.read_text(encoding="utf-8"))
         old = subprocess.run(["git", "show", f"{BASE}:src/OTGW-firmware/MQTTHaDiscovery.cpp"], cwd=REPO,
                              capture_output=True, check=True).stdout.decode("utf-8")
-        cls.base = table(old)
+        cls.base = [r for r in table(old) if r[1] not in RETIRED_ROWS]
         unc = lambda rows: sum(1 for r in rows if r[3] == "none" and r[4])
         print(f"\nrows {len(cls.fix)}; uncategorised+enabled: base {unc(cls.base)} -> fix {unc(cls.fix)}")
 

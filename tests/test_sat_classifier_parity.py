@@ -22,7 +22,8 @@ either side (missing samples).
 
 Two configurations, because the port has decided deviations built in:
   parity    overshoot margin 3.0 (cycles/const.py:10) and cold setpoint 22 (const.py:34), upstream untouched
-  firmware  overshoot margin 2.0 (entries 15, 37) and cold setpoint 28.2 (entries 7, 11, 200); the upstream module globals
+  firmware  overshoot margin 3.0 (the setting SATpwmswitchmargin, default 3.0; TASK-3151.3, ADR-306: no deviation left) and cold
+            setpoint 28.2 (entries 7, 11, 200); the upstream module globals
             OVERSHOOT_MARGIN_CELSIUS and COLD_SETPOINT of classifier.py are set to those values for the run and restored
             (the only change to the loaded code; no file is modified)
 
@@ -77,7 +78,7 @@ CONT, PWM = 1, 2
 
 CONFIGS = {
     "parity": {"margin": 3.0, "cold": 22.0},
-    "firmware": {"margin": 2.0, "cold": 28.2},
+    "firmware": {"margin": 3.0, "cold": 28.2},
 }
 
 
@@ -270,7 +271,7 @@ def build_scenarios():
         lambda t: dict(flow=45.0) if 60 <= t < 150 else {})
 
     # boundary margins (error = flow - control 50; the exact value, one representable step and 0.004 either side)
-    for cfg, m in (("parity", 3.0), ("firmware", 2.0)):
+    for cfg, m in (("parity", CONFIGS["parity"]["margin"]), ("firmware", CONFIGS["firmware"]["margin"])):
         for tag, off in (("below_025", -0.25), ("below_0004", -0.004), ("exact", 0.0), ("above_025", 0.25)):
             add("overshoot_boundary_%s_%s" % (cfg, tag), "error %+.3f at margin %.1f (all 180 tail seconds)" % (m + off, m), 300,
                 (lambda fl: (lambda t: dict(flow=fl)))(50.0 + m + off), cfgs=(cfg,))
@@ -375,7 +376,7 @@ int main(int argc, char** argv) {
     return 0;
   }
   if (argc < 4) return 2;
-  settings.sat.fOvershootMargin = (float)atof(argv[1]);
+  settings.sat.fPwmSwitchMargin = (float)atof(argv[1]);   // TASK-3151.3: the one margin
   g_cold = (float)atof(argv[2]);
   settings.sat.bSimulation = false;
   FILE* fp = fopen(argv[3], "r");
@@ -612,14 +613,14 @@ class TestParity(Base):
                 self.assertEqual((u["verdict"], p["verdict"]), (want, want))
 
     def test_recorded_configuration_deviations_change_the_verdict(self):
-        """The decided deviations (margin 2.0, cold 28.2) are real: the same trace flips between the two configurations,
-        identically on both sides."""
+        """The decided deviation (cold 28.2; the margin 2.0 of entry 15 is gone since TASK-3151.3) is real: the same trace flips
+        between the two configurations, identically on both sides."""
         obs = observed()
         u3, p3 = obs[("underheat_cold_setpoint", "parity")]
         u2, p2 = obs[("underheat_cold_setpoint", "firmware")]
         self.assertEqual((u3["verdict"], p3["verdict"]), ("UNDERHEAT", "UNDERHEAT"))      # 25 >= COLD 22
         self.assertEqual((u2["verdict"], p2["verdict"]), ("UNCERTAIN", "UNCERTAIN"))      # 25 < 28.2 (entries 7, 11, 200)
-        for cfg, flow_off in (("parity", 3.0), ("firmware", 2.0)):
+        for cfg, flow_off in (("parity", 3.0), ("firmware", 3.0)):
             u, p = obs[("overshoot_boundary_%s_exact" % cfg, cfg)]
             self.assertEqual((u["verdict"], p["verdict"]), ("OVERSHOOT", "OVERSHOOT"), "error exactly at the margin counts (>=, entry 37)")
 

@@ -242,7 +242,11 @@ int main(int argc, char** argv) {
         self.assertEqual(self.disp("heating_curve"), ["0", "0"])
 
     def test_other_settings_still_dispatch(self):
-        self.assertEqual(self.disp("overshoot_margin", "3.0")[0], "1")
+        # TASK-3151.3: the one overshoot margin is pwm_switch_margin (SATpwmswitchmargin); overshoot_margin is gone.
+        self.assertEqual(self.disp("pwm_switch_margin", "3.0")[0], "1")
+
+    def test_overshoot_margin_is_no_longer_a_setting_name(self):
+        self.assertEqual(self.disp("overshoot_margin", "3.0")[0], "0")
 
 
 class RestDocs(unittest.TestCase):

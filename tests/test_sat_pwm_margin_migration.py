@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
-"""TASK-2005: the continuous -> PWM switch margin moves to a 2.0 C default; a stored old default 1.5 migrates to 2.0 once.
+"""TASK-3151.3: the continuous -> PWM switch margin has the thermo-nova default 3.0 C; a stored old default (1.5 or 2.0) migrates to 3.0 once.
 
-Sergeant D entry 407 (2 C for 60 s instead of 1.5 C for 30 s); Q-407a answered by Robert (maintainer, in session): A, 2.0
-is the new default of the existing setting SATpwmswitchmargin. Since TASK-1888 every settings save writes
-SATpwmswitchmargin, so a stored 1.5 is the old default, not a user choice (our reading, recorded in entry 407): it moves
-to 2.0 once. Any other stored value stays. The marker key SATpwmmargin2 tells a migrated file apart (TASK-1961 pattern).
+Robert 2026-11-28 08:57 (the margin stays a user setting, default 3.0; register entry 522) and the coordinator's decision A
+(entry 523): since TASK-1888 every settings save writes SATpwmswitchmargin, so a stored 1.5 (the TASK-1888 default) or 2.0
+(the TASK-2005 default) is an old default, not a user choice, and cannot be told from a deliberate one: it moves to 3.0 once.
+Any other stored value stays. The marker key SATpwmmargin3 tells a migrated file apart (TASK-1961 pattern); a stale
+SATpwmmargin2 line of the TASK-2005 migration matches no setter and is ignored.
 
-The code under test is REAL, cut from the firmware sources: the SATpwmswitchmargin and SATpwmmargin2 setter lines of
+The code under test is REAL, cut from the firmware sources: the SATpwmswitchmargin and SATpwmmargin3 setter lines of
 updateSetting() and their write lines in writeSettings() (settingStuff.ino), clampSettingFloat(), the
 "[sat-pwmmargin-migrate:begin]" block of readSettings(), and the fPwmSwitchMargin default of SATtypes.h. The host
 program plays the settings file: parse = run the setter lines per stored key on a default-constructed struct, then the
 migration block; flush = run the write lines. A host build cannot boot LittleFS; the bench covers the real file.
 
-Cases: (a) a file with 1.5 and no marker -> 2.0, dirty, after the flush the marker is stored and a second boot keeps 2.0
-without a new save; (b) a file with 2.5 and no marker -> 2.5 stays (the marker is still written); (c) a file with the
-marker and 1.5 (the user set 1.5 after the migration) -> stays 1.5; (d) a new install -> 2.0.
+Cases: (a) 1.5 and no marker -> 3.0, dirty, after the flush the marker is stored and a second boot keeps 3.0 without a
+new save; (a2) the same for a stored 2.0; (b) 2.5 and (b2) 4.0 and no marker -> stay (the marker is still written);
+(c) the marker and 1.5 or 2.0 (the user set it after the migration) -> stays; (d) a new install -> 3.0 with the marker;
+(e) no SATpwmswitchmargin key at all and no marker -> the default 3.0; (f) a file that only has the stale SATpwmmargin2
+marker and 2.0 -> 3.0 (the old marker does not count).
 
-Old-vs-fix: OTGW_SETTINGSTUFF_INO / OTGW_SATTYPES_H point at another copy. The code before TASK-2005 has default 1.5 and
-no migration: (a) and (d) go red.
+Old-vs-fix: OTGW_SETTINGSTUFF_INO / OTGW_SATTYPES_H point at another copy. On the code of TASK-2005 (default 2.0, marker
+SATpwmmargin2, only 1.5 migrates) every case goes red (the marker name and the default differ; a, a2, d, e and f also on the values).
 Run: python tests/test_sat_pwm_margin_migration.py
 """
 import os
@@ -93,22 +96,29 @@ static void readSettings(const File& file) {
 static bool hasKey(const File& f, const char* k) { for (auto& kv : f) if (kv.first == k) return true; return false; }
 static void show(const char* tag, const File& f) {
   printf("%s m=%.2f dirty=%d marker=%d\n", tag, settings.sat.fPwmSwitchMargin, settingsDirty ? 1 : 0,
-         hasKey(f, "SATpwmmargin2") ? 1 : 0);
+         hasKey(f, "SATpwmmargin3") ? 1 : 0);
 }
 int main(int argc, char** argv) {
   std::string c = argv[1];
   File f;
-  if (c == "a" || c == "b") {
-    // written by TASK-1888 .. beta.360: every save stored SATpwmswitchmargin, no marker
-    f = {{"SATovershootmargin", "2.00"}, {"SATpwmswitchmargin", c == "a" ? "1.50" : "2.50"}};
+  if (c == "a" || c == "a2" || c == "b" || c == "b2") {
+    // written by TASK-1888 .. TASK-3151: every save stored SATpwmswitchmargin, no SATpwmmargin3 marker
+    const char* v = c == "a" ? "1.50" : c == "a2" ? "2.00" : c == "b" ? "2.50" : "4.00";
+    f = {{"SATpwmswitchmargin", v}};
     readSettings(f); show("boot1", f);
     if (settingsDirty) { f.clear(); writeSettings(f); }
     readSettings(f); show("boot2", f);
-  } else if (c == "c") {
-    f = {{"SATpwmswitchmargin", "1.50"}, {"SATpwmmargin2", "true"}};
+  } else if (c == "c" || c == "c2") {
+    f = {{"SATpwmswitchmargin", c == "c" ? "1.50" : "2.00"}, {"SATpwmmargin3", "true"}};
     readSettings(f); show("boot1", f);
   } else if (c == "d") {
     settings = Settings(); writeSettings(f);
+    readSettings(f); show("boot1", f);
+  } else if (c == "e") {
+    f = {};   // a settings file without the key, e.g. one from before TASK-1888
+    readSettings(f); show("boot1", f);
+  } else if (c == "f") {
+    f = {{"SATpwmswitchmargin", "2.00"}, {"SATpwmmargin2", "true"}};   // only the stale TASK-2005 marker
     readSettings(f); show("boot1", f);
   }
   return 0;
@@ -122,8 +132,8 @@ def build():
     assert m, "fPwmSwitchMargin default not found in SATtypes.h"
     clamp = re.search(r"^static float clampSettingFloat\(.*?^}\n", ss, re.S | re.M)
     assert clamp, "clampSettingFloat not found"
-    setters = lines_with(ss, r'PSTR\("SAT(pwmswitchmargin|pwmmargin2)"\)\)\s*==\s*0\)')
-    writers = lines_with(ss, r'writeJson(Float|Bool)KV\(file, F\("SAT(pwmswitchmargin|pwmmargin2)"\)')
+    setters = lines_with(ss, r'PSTR\("SAT(pwmswitchmargin|pwmmargin\d)"\)\)\s*==\s*0\)')
+    writers = lines_with(ss, r'writeJson(Float|Bool)KV\(file, F\("SAT(pwmswitchmargin|pwmmargin\d)"\)')
     assert "SATpwmswitchmargin" in setters and "SATpwmswitchmargin" in writers, "setter / writer not found"
     blk = re.search(r"// \[sat-pwmmargin-migrate:begin\][^\n]*\n(.*?)// \[sat-pwmmargin-migrate:end\]", ss, re.S)
     return (PRE.replace("@DEFAULT@", "float fPwmSwitchMargin = %sf;" % m.group(1)).replace("@CLAMP@", clamp.group(0))
@@ -160,21 +170,38 @@ def run(case):
 
 
 class PwmMarginMigration(unittest.TestCase):
-    def test_a_stored_old_default_1_5_migrates_to_2_once(self):
+    def test_a_stored_old_default_1_5_migrates_to_3_once(self):
         r = run("a")
-        self.assertEqual(r["boot1"], {"m": 2.0, "dirty": 1, "marker": 0}, "first boot: 2.0 and a deferred save")
-        self.assertEqual(r["boot2"], {"m": 2.0, "dirty": 0, "marker": 1}, "after the save: marker stored, no repeat")
+        self.assertEqual(r["boot1"], {"m": 3.0, "dirty": 1, "marker": 0}, "first boot: 3.0 and a deferred save")
+        self.assertEqual(r["boot2"], {"m": 3.0, "dirty": 0, "marker": 1}, "after the save: marker stored, no repeat")
+
+    def test_a2_stored_old_default_2_0_migrates_to_3_once(self):
+        r = run("a2")
+        self.assertEqual(r["boot1"], {"m": 3.0, "dirty": 1, "marker": 0})
+        self.assertEqual(r["boot2"], {"m": 3.0, "dirty": 0, "marker": 1})
 
     def test_b_a_user_value_stays(self):
         r = run("b")
         self.assertEqual(r["boot1"]["m"], 2.5)
         self.assertEqual(r["boot2"], {"m": 2.5, "dirty": 0, "marker": 1})
 
-    def test_c_1_5_set_after_the_migration_stays(self):
-        self.assertEqual(run("c")["boot1"], {"m": 1.5, "dirty": 0, "marker": 1})
+    def test_b2_a_value_above_the_default_stays(self):
+        r = run("b2")
+        self.assertEqual(r["boot1"]["m"], 4.0)
+        self.assertEqual(r["boot2"], {"m": 4.0, "dirty": 0, "marker": 1})
 
-    def test_d_new_install_gets_2(self):
-        self.assertEqual(run("d")["boot1"], {"m": 2.0, "dirty": 0, "marker": 1})
+    def test_c_a_value_set_after_the_migration_stays(self):
+        self.assertEqual(run("c")["boot1"], {"m": 1.5, "dirty": 0, "marker": 1})
+        self.assertEqual(run("c2")["boot1"], {"m": 2.0, "dirty": 0, "marker": 1})
+
+    def test_d_new_install_gets_3(self):
+        self.assertEqual(run("d")["boot1"], {"m": 3.0, "dirty": 0, "marker": 1})
+
+    def test_e_a_file_without_the_key_gets_the_default_3(self):
+        self.assertEqual(run("e")["boot1"]["m"], 3.0)
+
+    def test_f_the_stale_marker_of_task_2005_does_not_count(self):
+        self.assertEqual(run("f")["boot1"], {"m": 3.0, "dirty": 1, "marker": 0})
 
 
 if __name__ == "__main__":
