@@ -43,7 +43,7 @@ status_history:
   - date: 2026-11-28
     status: Proposed
     changed_by: "Agent: Claude (otgw-architect)"
-    reason: "Initial proposal. Decision makers: Robert van den Breemen for the setting with default 3.0 (coordinator chat 2026-11-28 08:57, register entry 522; relayed, not seen by otgw-architect); the coordinator for the verdict using the same setting and the SATpwmmargin3 migration (09:02, reversible; Robert is told)."
+    reason: "Initial proposal. Decision makers: Robert van den Breemen for the setting with default 3.0 (coordinator chat 2026-11-28 08:57, register entry 522; relayed, not seen by otgw-architect) and for one margin and one setting (DM 1576146949323751437, read back by otgw-architect); the coordinator for the SATpwmmargin3 migration (09:02, register entry 523, reversible; Robert is told)."
     changed_via: adr-kit
 ```
 
@@ -65,9 +65,15 @@ The margin of the continuous-to-PWM rule of ADR-305 is the user setting `satpwms
 
 - The setting stays, with its key, its REST (Representational State Transfer) field `pwm_switch_margin`, its MQTT (Message Queuing Telemetry Transport) topic `sat/pwm_switch_margin`, its web UI field and its range 0.5-5.0. Only its default changes, from 2.0 to 3.0.
 - ADR-305's text "the setting `satpwmswitchmargin` is removed, and an old key in `settings.ini` is ignored on load" no longer holds. The Must Not "Use the setting `satpwmswitchmargin` ... for a mode decision" no longer holds for this rule.
-- **The end-of-cycle verdict uses the same setting** (decided by the coordinator, 09:02; register entry 523). A continuous cycle whose tail p90 of flow minus control setpoint is at or above `satpwmswitchmargin` gets the OVERSHOOT verdict and enables PWM. This replaces ADR-305's "fixed 3.0, with `satovershootmargin` as the label only" for the verdict.
+- **The end-of-cycle verdict uses the same setting** (decided by the coordinator, 09:02, register entry 523; confirmed in intent by Robert's DM 1576146949323751437). A continuous cycle whose tail p90 of flow minus control setpoint is at or above `satpwmswitchmargin` gets the OVERSHOOT verdict and enables PWM. This replaces ADR-305's "fixed 3.0, with `satovershootmargin` as the label only" for the verdict.
   - Reason: thermo-nova uses one constant, `OVERSHOOT_MARGIN_CELSIUS` (`cycles/const.py:10`), both for the runtime enable (`heating_control.py:288`) and for the verdict (`cycles/classifier.py:74`). One margin with one meaning keeps the two paths from disagreeing.
-- **`satovershootmargin` does not change** (key, default 2.0, range). It still labels the classification shown to the user (`SATcycles.ino:961`) and feeds the overshoot-seconds count (`SATcycles.ino:1287`). It decides no mode. With both settings at their defaults (2.0 and 3.0), a cycle with a p90 between 2.0 and 3.0 shows the label OVERSHOOT while the verdict leaves the mode as it is. The verdict decides the mode.
+- **One margin, one setting** (Robert, DM 1576146949323751437, 08:05:16 UTC, after the ADR-306 question): "Klinkt niet goed. Mijn bedoeling is 1 overshoot switch to PMW margins and setting." In English: "That does not sound right. My intent is one overshoot switch-to-PWM margin and setting." The coordinator's reading was sent back to him for confirmation (DM 1576147063882776688):
+  - one overshoot margin, the setting `satpwmswitchmargin` (default 3.0);
+  - it serves the continuous-to-PWM switch, the end-of-cycle verdict and the classification shown to the user;
+  - the separate setting `satovershootmargin` goes;
+  - the underheat exit stays a fixed rule.
+  - This ADR follows that reading. Acceptance waits for his confirmation.
+- **`satovershootmargin` goes.** The classification label (`SATcycles.ino:961`) and the overshoot-seconds count (`SATcycles.ino:1287`) read `satpwmswitchmargin` instead. The key `SATovershootmargin` (`settingStuff.ino:385`) is no longer written, and an old key in `settings.ini` is ignored on load. Its REST, MQTT and web UI fields go. With one margin, the label and the verdict can no longer disagree.
 - **Register.** Entry 523 (OTGW-sat-decisions main ec2c041) records the verdict and migration decisions of the coordinator. It supersedes the part of entry 522 that reads "verdict + underheat stay 3.0" for the verdict. Entry 522 stands for the setting with default 3.0, and for the underheat exit.
 - **The underheat exit stays fixed:** requested - 3.0 C for 180 s (ADR-305 Decision 3, `cycles/const.py:11`). The 60 s hold and the 300 s saturation exit also stay as ADR-305 has them.
 - **One-time migration to 3.0** (decided by the coordinator, 09:02; reversible; Robert is told; register entry 523).
@@ -82,14 +88,15 @@ The margin of the continuous-to-PWM rule of ADR-305 is the user setting `satpwms
 
 ### Must
 
-- Read the continuous-to-PWM margin and the end-of-cycle verdict margin from `settings.sat.fPwmSwitchMargin`, with default 3.0.
+- Read the continuous-to-PWM margin, the end-of-cycle verdict margin, the classification label margin and the overshoot-seconds margin from `settings.sat.fPwmSwitchMargin`, with default 3.0.
+- Stop writing `SATovershootmargin`, and ignore an old key on load.
 - Keep the key `SATpwmswitchmargin`, its range 0.5-5.0, the REST field and the MQTT topic.
 - Migrate once, under the marker `SATpwmmargin3`: a stored 1.5 or 2.0 becomes 3.0, and every other value stays.
 
 ### Must Not
 
 - Use the setting for the underheat exit or the saturation exit.
-- Let `satovershootmargin` decide a mode.
+- Keep a second overshoot margin setting.
 - Rewrite a stored value other than 1.5 or 2.0, or run the migration a second time.
 
 ### Exceptions
@@ -115,6 +122,7 @@ The margin of the continuous-to-PWM rule of ADR-305 is the user setting `satpwms
 - **Fixed 3.0 (ADR-305 as written).** Rejected by Robert's message: he wants the margin settable.
 - **No migration (stored 2.0 stays).** Rejected by the coordinator. Almost every upgraded unit would keep 2.0, because every save writes the key.
 - **Verdict fixed at 3.0, separate from the setting (ADR-305 as written).** Rejected by the coordinator. The runtime rule and the verdict would then use different margins, while thermo-nova uses one constant for both.
+- **Keep `satovershootmargin` as a label-only setting** (the first draft of this ADR). Rejected by Robert, DM 1576146949323751437: one margin and one setting.
 - **Keep default 2.0.** Rejected: Robert set the default at 3.0.
 
 ## Consequences
@@ -127,12 +135,13 @@ The margin of the continuous-to-PWM rule of ADR-305 is the user setting `satpwms
 **Negative:**
 
 - **The migration overwrites a deliberate 2.0.** A user who chose 2.0 on purpose sees it become 3.0 once. The firmware cannot tell that 2.0 apart from the old default. Mitigation: the beta notes say so, and the user can set 2.0 again; the marker stops a second migration.
-- **The label and the verdict can disagree** at the default settings (label at 2.0, verdict at 3.0). The web UI may show OVERSHOOT for a cycle that does not switch to PWM.
+- **`satovershootmargin` is removed from the API** (the MQTT settings command `overshoot_margin`, `MQTTstuff.ino:735`; the REST setting `overshoot_margin`, `restAPI.ino:1660-1661`, and its field `settings.sat.overshoot_margin`, `:2314`; the web UI field). A Home Assistant automation that writes it no longer has an effect. A user who had tuned it to change the classification now tunes `satpwmswitchmargin`, which also moves the switch.
+- **The classification moves from 2.0 to 3.0 at the defaults.** Fewer cycles show OVERSHOOT than before.
 - The docs and the help text keep the setting but must show the new default (`settingsHelp.h:138`, `docs/api/MQTT.md:376`, `docs/api/openapi.yaml`, MANUAL 5.6). These docs rows in `_comms/adr305_docs_lines_to_change_2026-11-28.md` change from "remove" to "default 3.0".
 
 ## Open Questions
 
-- None.
+- [ ] Robert confirms the coordinator's reading of DM 1576146949323751437 (DM 1576147063882776688): one margin and one setting, `satovershootmargin` goes, the underheat exit stays fixed, the one-time migration stays unless he says no.
 
 ## Related Decisions
 
@@ -143,5 +152,6 @@ The margin of the continuous-to-PWM rule of ADR-305 is the user setting `satpwms
 
 - Robert van den Breemen, coordinator chat 2026-11-28 08:57 (relayed by the OTGW Coordinator at 08:58; no Discord id); register entry 522 (OTGW-sat-decisions main 5ec9755).
 - The coordinator's decisions on the verdict margin and the migration, cross-session message of 09:02.
+- Robert's DM 1576146949323751437 and the coordinator's read-back DM 1576147063882776688 (both read back by otgw-architect).
 - thermo-nova 7beaaf5 (https://github.com/Alexwijn/SAT/tree/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb/custom_components/sat): `cycles/const.py:10-11`, `heating_control.py:288-297`, `cycles/classifier.py:74`.
-- Firmware at origin/dev e0b06a180: `SATtypes.h:565-566`, `settingStuff.ino:386-387`, `:735-738`, `:1242`; `SATcycles.ino:961`, `:1287`.
+- Firmware at origin/dev e0b06a180: `SATtypes.h:565-566`, `settingStuff.ino:386-387`, `:735-738`, `:1242`; `SATcycles.ino:961`, `:1287`; `settingStuff.ino:385`, `:1241`; `MQTTstuff.ino:735`; `restAPI.ino:1660-1661`, `:2314`.
