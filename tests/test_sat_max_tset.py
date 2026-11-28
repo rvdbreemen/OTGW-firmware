@@ -177,7 +177,7 @@ def build(workdir: Path):
     for fn in ("static float clampSettingFloat(", "static float parseMaxTSetUser("):   # the real helper and the real setter
         a = setter.index(fn)
         parse += setter[a:setter.index("\n}", a) + 2] + "\n"
-    atmax = cut(src[src.index("// --- Clamp to valid range ---"):], "  float maxSetpoint = satEffectiveMaxSetpoint();", "  // Entry 214:").replace("state.sat.eControlMode", "g_mode")
+    atmax = cut(src[src.index("// --- Clamp to valid range ---"):], "  float maxSetpoint = satEffectiveMaxSetpoint();", "  // --- Sustained overshoot: continuous -> PWM").replace("state.sat.eControlMode", "g_mode")
     cpp = workdir / "maxtset.cpp"
     feed = FEED_H.read_text(encoding="utf-8").replace("#pragma once", "")
     cpp.write_text(STUBS.replace("@CONSTS@", consts).replace("@TYPES@", ok) + feed + block + parse + AT_MAX_STUBS + MAIN.replace("@ATMAX@", atmax), encoding="utf-8")
