@@ -48,8 +48,7 @@ class MmInPwm(unittest.TestCase):
         # TASK-3151.2 (ADR-305): a heating start runs in continuous, not in PWM, so the cold-start scenario S7 has no PWM stint
         # (it had the PWM-first start at the maximum duty before). What goes out is the continuous maximum, never MM=T.
         r = L.Run(self.exe, L.S7)
-        self.assertEqual([t for t, x in r.kind("MODE") if x == "2"], [], "the cold start entered PWM:
-" + r.dump(limit=25))
+        self.assertEqual([t for t, x in r.kind("MODE") if x == "2"], [], "the cold start entered PWM:\n" + r.dump(limit=25))
         frames = mm_frames(r)
         self.assertTrue(frames, "no MM= at all in the cold start")
         self.assertTrue({x for t, x in frames} <= {"MM=100"}, "unexpected MM in the continuous cold start: %r" % frames[:6])
