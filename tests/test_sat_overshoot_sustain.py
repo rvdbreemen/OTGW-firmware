@@ -22,18 +22,20 @@ not on a missing symbol.
 Tokens "<dt_ms>:<kind>[@<late_ms>]": the tick clock advances by dt_ms plus late_ms (the tick ran late; under
 SKIP_MISSED_TICKS the lateness carries into the following ticks, each tick = previous + interval + lateness),
 then the tick runs:
-  o  continuous, flow 52.5 (overshoot: 52.5 >= 50 + 2.0, below the 3.0 fail-safe, entry 429) e  continuous, flow 52 exactly requested + switch margin
+  o  continuous, flow 53.5 (overshoot: 3.5 over the request)   e  continuous, flow 53 exactly requested + switch margin (3.0)
+  h  continuous, flow 52.5 (2.5 over: below the 3.0 margin, no overshoot)
   n  continuous, flow 49 (no overshoot)                      p  PWM OFF phase, flow 55
   u  PWM ON phase, flow 40 (underheat: request 50 above flow) U  PWM ON phase, flow 47
   v  PWM ON phase, flow 49.5 (just below the request)        f  PWM ON phase, flow 40, flame OFF (TASK-1933)
   z  PWM ON phase, flow 50, PWM off time 0 (saturation)      b  the tick bypasses the switches (fault, ...)
   w  PWM ON phase, flow 50, PWM off time 1 (neither)
   m  PWM ON phase, flow missing (satGetFlowTemp() = 0.0, TASK-1428)   y  continuous, flow missing (TASK-1428)
+  I  PWM ON phase, flow 40, the flame LIGHTS at this tick (flame-on edge: the flame age is 0 here; ADR-305: the underheat exit has no flame-age gate)
   d  a hot-water tick (satCycleNoteDhwTick), the DHW bit is set from here on (satCycleNoteDhwBit(true))
   x  the loop pass at this time sees the DHW bit drop (satCycleNoteDhwBit(false)); no control tick runs
   s  a draw that began 5 s earlier and ends at this time, between two control ticks: no tick sees it, only the
      loop pass does (satCycleNoteDhwBit true then false). TASK-1429
-  M<margin>  set settings.sat.fOvershootMargin (no tick), e.g. "0:M5"   W<margin>  set settings.sat.fPwmSwitchMargin (TASK-1888)      R / P  the MsgID 3 permission refuses / permits PWM (no tick)
+  W<margin>  set settings.sat.fPwmSwitchMargin (no tick), the one margin (ADR-306)
   g<req>,<flow>  continuous, any requested setpoint and flow, e.g. "g45,62" (TASK-1412.7: setpoint fall, valve step, start-up,
      maximum limiting; the request is what the control loop passes in, after the caller's clamp to the effective maximum)
 Prints the tick time since the start of the first mode change ("t=<ms>"), or t=-1.
@@ -76,14 +78,21 @@ static bool _sat_bootBoilerLogged = false;
 static bool satStartGateActive() { return false; }   // TASK-1942: no start gate here; tests/test_sat_pwm_first_start.py runs the real one
 static bool _sat_bootOutsideLogged = false;
 enum SATControlMode { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
-struct SatSettings { float fOvershootMargin = 2.0f; float fPwmSwitchMargin = 2.0f; };   // TASK-2005: SATtypes.h default (checked by test_default_switch_margin_is_2_in_sattypes)
+struct SatSettings { float fPwmSwitchMargin = 3.0f; bool bSummerSimmer = true; };   // ADR-305 / TASK-3151.3: SATtypes.h default, thermo-nova's 3.0 (checked by test_default_switch_margin_is_3_in_sattypes)
 struct Settings { SatSettings sat; };
-struct SatState { SATControlMode eControlMode = SAT_MODE_CONTINUOUS; bool bDhwActive = false, bPwmFlameRequested = false; };
+struct SatState { SATControlMode eControlMode = SAT_MODE_CONTINUOUS; bool bDhwActive = false, bPwmFlameRequested = false, bValvesOpen = true, bSummerActive = false; };
 struct State { SatState sat; };
 static Settings settings; static State state;
 static uint32_t g_ms = 1000000UL; static float g_flow = 49.0f;
 static uint32_t millis() { return g_ms; }
 static float satGetFlowTemp() { return g_flow; }
+// ADR-305 / TASK-3151.1: the guards inside the cut-out (satHeatingDemandOn) read the valves, summer mode and the cold setpoint. They
+// are open here (valves open, no summer, cold 22 as thermo-nova); each guard is pinned with mutants by tests/test_sat_mode_guards_3151.py.
+#ifdef GATE_REAL_COLD   // the gate harness defines the real satColdThreshold() (cut out of SATcontrol.ino) after the cycles section
+static float satColdThreshold();
+#else
+static float satColdThreshold() { return 22.0f; }
+#endif
 static bool g_flame = true;            // TASK-1933: the entry-342 exit counts only with the flame on (token f: flame off)
 static bool satIsFlameOn() { return g_flame; }
 // TASK-3008 (entry 456): the flame edge state satCycleFlameEstablished() reads (satCycleOnFlameChange() keeps it on the device).
@@ -94,12 +103,6 @@ static uint32_t g_offTime = 1;
 static uint32_t satPwmLastOffTimeMs() { return g_offTime; }
 static int g_switches = 0;
 static void satSetControlMode(SATControlMode m) { if (m != state.sat.eControlMode) g_switches++; state.sat.eControlMode = m; }
-// TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted
-static bool satPwmPermitted() { return true; }
-static void satPwmNoteRefused(uint8_t) {}
-static bool g_allow = true;            // TASK-1762 tokens R / P: the MsgID 3 permission refuses / permits the entry
-static bool satPwmEntryAllowed(uint8_t) { return g_allow; }
-static bool satCycleCheckLowLoadVeto() { return false; }
 
 """
 
@@ -141,7 +144,6 @@ int main(int argc, char** argv) {
       g_req = rq; g_flow = fl; g_offTime = 1;
       state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false;
     }
-    if (k == 'M') { settings.sat.fOvershootMargin = (float)atof(colon + 2); continue; }   // TASK-1762: margin setting
     if (k == 'W') { settings.sat.fPwmSwitchMargin = (float)atof(colon + 2); continue; }   // TASK-1888: switch margin
     if (k == 'F') {                        // entries 428/429: the flame goes out (satCycleOnFlameChange calls this on the device)
 #ifdef HAS_BURN
@@ -149,8 +151,6 @@ int main(int argc, char** argv) {
 #endif
       continue;
     }
-    if (k == 'R') { g_allow = false; continue; }                                       // TASK-1762: MsgID 3 refuses PWM
-    if (k == 'P') { g_allow = true; continue; }                                        // TASK-1762: MsgID 3 permits PWM again
     if (k == 'b') {
 #ifdef HAS_SKIP
       satCycleSkipAutoSwitch();
@@ -183,13 +183,14 @@ int main(int argc, char** argv) {
       state.sat.bDhwActive = false;
       continue;
     }
-    if (k == 'o' || k == 'n' || k == 'e') { state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false;
-                                            g_flow = (k == 'o') ? 52.5f : (k == 'e') ? 52.0f : 49.0f; g_offTime = 1; }
+    if (k == 'o' || k == 'n' || k == 'e' || k == 'h') { state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false;
+                                            g_flow = (k == 'o') ? 53.5f : (k == 'e') ? 53.0f : (k == 'h') ? 52.5f : 49.0f; g_offTime = 1; }
     if (k == 'p') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = false; g_flow = 55.0f; g_offTime = 1; }
     g_flame = (k != 'f');
+    if (k == 'I') _cycle_flameOn = false;   // the previous tick had the flame out: this tick is the flame-on edge
     if (g_flame && !_cycle_flameOn) _cycle_flameOnStartMs = g_ms;   // TASK-3008: a flame-on edge at this tick
     _cycle_flameOn = g_flame;
-    if (k == 'u') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 40.0f; g_offTime = 1; }
+    if (k == 'u' || k == 'I') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 40.0f; g_offTime = 1; }
     if (k == 'f') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 40.0f; g_offTime = 1; }
     if (k == 'v') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 49.5f; g_offTime = 1; }
     if (k == 'U') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 47.0f; g_offTime = 1; }
@@ -324,24 +325,32 @@ class SustainedSwitches(unittest.TestCase):
         self.assertEqual(self.switch_at(ticks(30000, "eeee")), 30000 + SWITCH_MS)
 
     # Q43 A: a flow just below the threshold does not count.
-    # TASK-2005 (entry 407, Q-407a): the switch is flow - requested >= 2.0 C (fPwmSwitchMargin default) for 60 s. A flow 1.6 C
-    # over the request switched after 30 s under TASK-1888 (1.5 C); it never switches now, 2.0 C does after 60 s.
-    def test_flow_1_6_over_the_request_no_longer_switches(self):
-        self.assertEqual(self.run_ticks(["30000:g50,51.6"] * 12)["t"], "-1")
+    # ADR-305 (Robert 2026-11-28, TASK-3151.3): the switch is flow - requested >= 3.0 C (fPwmSwitchMargin default, thermo-nova's
+    # value) for 60 s. 2.5 C and 2.9 C over the request never switch (2.0 C did until ADR-305); 3.0 C does after 60 s.
+    def test_flow_2_5_over_the_request_never_switches(self):
+        self.assertEqual(self.run_ticks(["30000:g50,52.5"] * 12)["t"], "-1")   # 360 s held
+        self.assertEqual(self.run_ticks(["10000:g50,52.5"] * 12)["t"], "-1")   # 120 s held, 10 s ticks
 
-    def test_flow_2_0_over_the_request_switches_after_60s(self):
-        self.assertEqual(self.switch_at(["30000:g50,52"] * 6), 30000 + SWITCH_MS)
+    def test_flow_2_9_over_the_request_never_switches(self):
+        self.assertEqual(self.run_ticks(["30000:g50,52.9"] * 12)["t"], "-1")
 
-    # TASK-2005: the stub's 2.0 must be the real default of the setting.
-    def test_default_switch_margin_is_2_in_sattypes(self):
+    def test_flow_3_0_over_the_request_switches_after_60s_not_30s(self):
+        self.assertEqual(self.run_ticks(["10000:g50,53"] * 5)["t"], "-1", "no switch 40 s after the first tick (was 30 s: the fail-safe)")
+        self.assertEqual(self.switch_at(["10000:g50,53"] * 12), 10000 + SWITCH_MS)
+        self.assertEqual(self.switch_at(["30000:g50,53"] * 6), 30000 + SWITCH_MS)
+
+    # ADR-305 verification table, control row: flow 3.0 C over for 60 s from a clean continuous state switches. Green on the code
+    # before ADR-305 as well (it switched at 30 s there), so it shows the rule still works, not that the code changed.
+    def test_control_flow_3_0_over_from_clean_continuous_switches_within_70s(self):
+        t = self.switch_at(["10000:g50,53"] * 12)
+        self.assertTrue(0 < t <= 70000, t)
+
+    # TASK-2005 / ADR-305: the stub's 3.0 must be the real default of the setting.
+    def test_default_switch_margin_is_3_in_sattypes(self):
         src = Path(os.environ.get("OTGW_SATTYPES_H", FW / "SATtypes.h")).read_text(encoding="utf-8")
         m = re.search(r"^\s*float\s+fPwmSwitchMargin\s*=\s*([0-9.]+)f\s*;", src, re.M)
         self.assertIsNotNone(m, "fPwmSwitchMargin default not found in SATtypes.h")
-        self.assertEqual(float(m.group(1)), 2.0)
-
-    # Q-327b A (entry 360): the classifier's overshoot margin no longer moves the switch.
-    def test_classifier_margin_does_not_move_the_switch(self):
-        self.assertEqual(self.switch_at(["0:M5"] + ticks(30000, "oooooo")), 30000 + SWITCH_MS)
+        self.assertEqual(float(m.group(1)), 3.0)
 
     # The switch margin is its own setting (0.5-5.0): raised to 2.5, 52.4 no longer counts and 52.5 does.
     def test_switch_margin_setting_moves_the_threshold(self):
@@ -382,18 +391,22 @@ class SustainedSwitches(unittest.TestCase):
                 self.assertEqual(self.run_ticks(ticks(dt, "v" * 12))["t"], "-1")
                 self.assertEqual(self.run_ticks(ticks(dt, "w" * 12))["t"], "-1")
 
-    # TASK-3008 (entry 456, ba515c8 heating_control.py:418-422, :455-460): the underheat timer counts only once the flame has
-    # burned 180 s. Flame off throughout: never. f@30 (off) then u from 60: the flame lights at 60, is established at 240,
-    # underheat starts there and fires at 240 + 180 = 420. Entry 448 alone (7beaaf5) fired at 60 + 180 = 240.
-    def test_underheat_never_counts_with_the_flame_off(self):
-        self.assertEqual(self.run_ticks(ticks(30000, "f" * 20))["t"], "-1")
+    # ADR-305 (entry 456 replaced): no flame-age gate before the underheat exit. The exit is thermo-nova's, 3.0 C below the request
+    # for 180 s from the first qualifying tick (heating_control.py:330-344). A flame that lights at the first tick (token I) gives the
+    # exit at 30 + 180 s; before ADR-305 the flame had to burn 180 s first (exit at about 390 s). The tests
+    # test_underheat_waits_for_180s_of_flame, test_underheat_never_counts_with_the_flame_off and test_flame_off_restarts_the_flame_wait
+    # (the old gate) are deleted with it.
+    def test_underheat_counts_from_the_ignition_tick(self):
+        self.assertEqual(self.switch_at(ticks(30000, "I" + "u" * 12)), 30000 + 180000)
 
-    def test_underheat_waits_for_180s_of_flame(self):
-        self.assertEqual(self.switch_at(ticks(30000, "f" + "u" * 16)), 30000 * 2 + 180000 + 180000)
+    def test_underheat_run_survives_a_flame_out_and_relight(self):
+        # u@30 u@60 (flame burning), f@90 (flame out), I@120 relights: the qualifying run started at 30 is not cleared by the flame.
+        self.assertEqual(self.switch_at(ticks(30000, "uu" + "f" + "I" + "u" * 8)), 30000 + 180000)
 
-    # A flame-off in the middle resets it: u from 30, f@120 (out), u from 150: lit at 150, established at 330, fires at 510.
-    def test_flame_off_restarts_the_flame_wait(self):
-        self.assertEqual(self.switch_at(ticks(30000, "uuu" + "f" + "u" * 16)), 30000 * 5 + 180000 + 180000)
+    # Same as thermo-nova (heating_control.py:321-323 and :331-356): the underheat count runs in the PWM ON phase, which includes the
+    # wait for ignition; the flame is not read (otgw-poc-dev, ADR-305). Token f: ON phase, flame out, flow 40 against 50.
+    def test_underheat_counts_in_the_on_phase_with_the_flame_out_as_thermo_nova_does(self):
+        self.assertEqual(self.switch_at(ticks(30000, "f" * 12)), 30000 + 180000)
 
     # A flow above request - 3 resets the underheat start: u@30 w@60 u@90 ... fires at 90 + 180.
     def test_underheat_dip_restarts_the_timer(self):
@@ -512,18 +525,13 @@ class SustainedSwitches(unittest.TestCase):
 
 
 
-# TASK-1762, Sergeant D entries 288 and 289: the flame-out fail-safe. In continuous mode flow - requested (PID) setpoint
-# >= 3.5 C held for 30 s also switches to PWM, beside the switch rule (thermo-nova has only that one rule,
-# heating_control.py:262-305). Same timer semantics (first qualifying tick starts it, no catch-up, entry 109), same gates
-# (continuous only, hot-water guard, missing flow), entry 213's MsgID 3 permission still blocks. Times are since the first token.
-# TASK-2005 (entry 407, Q-407a answered by Robert: C, the fail-safe stays): the switch rule is now 2.0 C / 60 s, so with the
-# defaults a flow at least 3.5 C over the request is taken by the fail-safe after 30 s, 30 s before the switch rule would
-# fire. These cases run with the switch margin at 5 C ("0:W5") to test the fail-safe on its own.
-class OnePwmEntryPerFlame(unittest.TestCase):
-    """Sergeant D entries 428/429/430 (2.0.0): a flame enters PWM at most once. After the exit to continuous with the flame on
-    (token u: PWM ON, flame on, request 50 above flow 40, 60 s), the switch rule (flow >= request + 2.0 for 60 s) does not take
-    that flame back to PWM; only the fail-safe (flow - request >= 3.0 for 30 s) does, and the flame going out (F) clears the
-    hold. Red on the code before it: the switch rule took the burn back to PWM (the continuous/PWM flipping of TASK-2005)."""
+# ADR-305 (entries 517, 519, 520; TASK-3151.1): the classes OnePwmEntryPerFlame (the flame that left PWM stays in continuous,
+# entries 428/429/430) and FlameOutFailsafe (flow - request >= 3.0 for 30 s switches to PWM, entries 288/289/417/429) are
+# deleted. They pinned two rules thermo-nova does not have (heating_control.py:262-305: one overshoot rule, no fail-safe, no lock) and
+# ADR-305 removes both. The rule that replaces them is pinned by SameFlameReentry below.
+class SameFlameReentry(unittest.TestCase):
+    """ADR-305: after a PWM exit with the flame lit, the same flame goes back to PWM by the one overshoot rule: flow >= request + 3.0
+    held for 60 s from the first qualifying tick. No lock holds the margin rule, no 30 s fail-safe takes the flame back earlier."""
     setUpClass = classmethod(SustainedSwitches.setUpClass.__func__)
     tearDownClass = classmethod(SustainedSwitches.tearDownClass.__func__)
 
@@ -531,128 +539,38 @@ class OnePwmEntryPerFlame(unittest.TestCase):
         if self.exe is None:
             self.skipTest("no host C++ compiler")
         out = subprocess.run([str(self.exe), "all", *toks], capture_output=True, text=True, check=True).stdout
-        return [(int(dict(kv.split("=") for kv in line.split())["t"]), int(dict(kv.split("=") for kv in line.split())["mode"]))
-                for line in out.splitlines() if not line.startswith("t=-1")]
+        rows = [dict(kv.split("=") for kv in line.split()) for line in out.splitlines() if not line.startswith("t=-1")]
+        return [(int(r["t"]), int(r["mode"])) for r in rows]
 
-    EXIT = ["0:u"] + ["30000:u"] * 6   # the underheat exit to continuous at t=180000 (PWM ON, flame on; TASK-3008: 180 s)
+    # Token u from a burning flame (flame lit 10 min before the first tick): PWM ON, request 50, flow 40, underheat exit.
+    # The exit timing itself is pinned by test_underheat_*; the cases below only need the exit as a starting point.
+    EXIT = ["0:u"] + ["30000:u"] * 6   # exit to continuous at t=180000, the flame stays on
 
-    def test_the_burn_that_left_pwm_stays_continuous_on_the_switch_rule(self):
-        sw = self.switches(self.EXIT + ticks(30000, "o" * 6))   # 52.5 >= 50 + 2.0 for 180 s, below the 3.0 fail-safe
-        self.assertEqual(sw[0][0], 180000, sw)
-        self.assertEqual(len(sw), 1, "the switch rule took the same flame back to PWM: %r" % (sw,))
+    def test_flow_3_0_over_takes_the_same_flame_back_to_pwm_60s_after_the_first_tick(self):
+        sw = self.switches(self.EXIT + ["30000:g50,53"] * 4)   # first qualifying tick t=210000
+        self.assertEqual(sw[0], (180000, 1), sw)
+        self.assertEqual(sw[1], (270000, 2), "re-entry 60 s after 210000, no lock, no 30 s fail-safe (240000): %r" % (sw,))
 
-    def test_only_the_failsafe_takes_that_burn_back_to_pwm_after_30s(self):
-        sw = self.switches(self.EXIT + ["30000:g50,53", "30000:g50,53", "30000:g50,53"])   # 53 - 50 = 3.0
-        self.assertEqual(len(sw), 2, sw)
-        self.assertEqual(sw[1], (240000, 2), "the 3.0 fail-safe fires 30 s after its first tick (t=210000): %r" % (sw,))
+    def test_flow_3_5_over_is_no_faster_than_3_0_over(self):
+        sw = self.switches(self.EXIT + ["30000:g50,54"] * 4)   # was the 30 s fail-safe at 240000
+        self.assertEqual(sw[1], (270000, 2), sw)
 
-    def test_the_flame_going_out_lets_the_next_flame_switch_again(self):
-        sw = self.switches(self.EXIT + ["0:F"] + ticks(30000, "o" * 4))
-        self.assertEqual(len(sw), 2, sw)
-        self.assertEqual(sw[1], (270000, 2), "after flame-off the 60 s switch rule applies again (first tick 210000): %r" % (sw,))
+    def test_flow_2_5_over_never_takes_the_same_flame_back(self):
+        sw = self.switches(self.EXIT + ["30000:g50,52.5"] * 12)
+        self.assertEqual(len(sw), 1, "only the exit: %r" % (sw,))
 
+    def test_a_burn_that_ended_is_no_different(self):
+        sw = self.switches(self.EXIT + ["0:F"] + ["30000:g50,53"] * 4)
+        self.assertEqual(sw[1], (270000, 2), sw)
 
-class FlameOutFailsafe(unittest.TestCase):
-    # Same compiled harness as SustainedSwitches (not a subclass, so its cases do not run twice).
-    setUpClass = classmethod(SustainedSwitches.setUpClass.__func__)
-    tearDownClass = classmethod(SustainedSwitches.tearDownClass.__func__)
-
-    def run_ticks(self, toks):
-        return SustainedSwitches.run_ticks(self, ["0:W5"] + list(toks))
-
-    def switch_at(self, toks):
-        return int(self.run_ticks(toks)["t"])
-
-    def g(self, *pairs, dt=30000):
-        return ["%d:g%g,%g" % (dt, rq, fl) for rq, fl in pairs]
-
-    def test_failsafe_switches_30s_after_the_first_qualifying_tick(self):
-        self.assertEqual(self.switch_at(self.g(*[(50, 54)] * 4)), 30000 + 30000)
-
-    def test_tjfs_2026_11_09_capture_replay_switches_30s_earlier(self):
-        # TASK-1762 AC4: the case behind entries 288/289, replayed through the real satCycleCheckOvershootSwitch().
-        # tjfs's capture 2026-11-09 (beta.161, OT-Direct gateway, Ideal Logic, SAT on), SATTICK lines at a 30 s control
-        # interval, (requested PID setpoint, flow): 12:46:01 (40.99, 45.0), 12:46:31 (39.99, 46.0), 12:47:01 (39.27, 46.0).
-        # On beta.161 the 60 s rule switched to PWM at 12:47:01 ("flow 46.0 stayed above setpoint 39.3 + 2.0 for 60 s").
-        # With the fail-safe the first tick already has flow - CS = 4.01 >= 3.5, so the switch comes 30 s later, at
-        # 12:46:31: one tick (30 s) earlier than the 60 s rule.
-        ticks = self.g((40.99, 45.0), (39.99, 46.0), (39.27, 46.0))
-        self.assertEqual(self.switch_at(ticks), 30000 + 30000, "fail-safe: 30 s after 12:46:01, i.e. at 12:46:31")
-
-    def test_failsafe_at_a_ten_second_tick(self):
-        self.assertEqual(self.switch_at(self.g(*[(50, 54)] * 6, dt=10000)), 10000 + 30000)
-
-    def test_failsafe_equality_counts(self):
-        # 53.0 = 50 + 3.0 exactly (both exact in binary floating point): ">=" as written (entries 288, 289, 429).
-        self.assertEqual(self.switch_at(self.g(*[(50, 53.0)] * 4)), 30000 + 30000)
-
-    def test_just_below_3_0_is_left_to_the_switch_rule(self):
-        # entry 429: 52.9 is below the 3.0 fail-safe, and with the class switch margin 5 no overshoot for either rule
-        self.assertEqual(self.run_ticks(self.g(*[(50, 52.9)] * 8))["t"], "-1")
-        # default switch margin 2.0 (no W): the switch rule takes it after 60 s
-        self.assertEqual(int(SustainedSwitches.run_ticks(self, self.g(*[(50, 52.9)] * 5))["t"]), 30000 + 60000)
-
-    def test_failsafe_boundary_29999_and_30000_ms(self):
-        self.assertEqual(self.run_ticks(["30000:g50,54", "29999:g50,54"])["t"], "-1", "29 999 ms must not switch")
-        self.assertEqual(self.switch_at(["30000:g50,54", "29999:g50,54", "1:g50,54"]), 30000 + 30000)
-
-    def test_dip_into_the_switch_band_resets_only_the_failsafe(self):
-        # switch margin 2.5: 54 @30, 52.5 @60 (2.5 <= 2.5 < 3.0: the switch timer keeps running, the fail-safe start clears),
-        # 54 @90: the switch rule started at 30 fires at 90 (60 s, TASK-2005), when the restarted fail-safe has only 0 s.
-        self.assertEqual(int(SustainedSwitches.run_ticks(self, ["0:W2.5"] + self.g((50, 54), (50, 52.5), (50, 54)))["t"]),
-                         90000)
-
-    def test_with_the_default_margins_the_failsafe_takes_a_big_overshoot_after_30s(self):
-        # TASK-2005: default switch margin 2.0 / 60 s against the fail-safe 3.5 / 30 s (kept, Q-407a C). A flow at least
-        # 3.5 C over the request qualifies for both from the same tick; the fail-safe is due 30 s after the start, the
-        # switch rule only after 60 s, so the fail-safe switches first.
-
-        for fl in (53.0, 54, 60):
-            with self.subTest(flow=fl):
-                r = SustainedSwitches.run_ticks(self, self.g(*[(50, fl)] * 4))
-                self.assertEqual(int(r["t"]), 30000 + 30000)
-
-    def test_dip_below_the_margin_resets_both(self):
-        self.assertEqual(self.switch_at(self.g((50, 54), (50, 51), (50, 54), (50, 54))), 90000 + 30000)
-
-    def test_missing_flow_resets_the_failsafe(self):
-        self.assertEqual(self.switch_at(["30000:g50,54", "30000:y", "30000:g50,54", "30000:g50,54"]), 90000 + 30000)
-
-    def test_a_pwm_tick_resets_the_failsafe(self):
-        self.assertEqual(self.switch_at(["30000:g50,54", "30000:p", "30000:g50,54", "30000:g50,54"]), 90000 + 30000)
-
-    def test_dhw_guard_blocks_the_failsafe_for_300s(self):
-        r = self.run_ticks(["30000:d"] + self.g(*[(50, 60)] * 9))         # g@60 .. g@300: inside the guard
-        self.assertEqual(r["t"], "-1")
-        self.assertEqual(self.switch_at(["30000:d"] + self.g(*[(50, 60)] * 11)), 30000 + 330000)
-
-    def test_failsafe_does_not_depend_on_the_margin_setting(self):
-        # Switch margin 5.0 (the setting allows 0.5-5.0, class default here): 54 is no overshoot for the switch rule
-        # (54 < 55), the fail-safe still fires. The classifier margin (M) plays no part in either rule (TASK-1888).
-        self.assertEqual(self.switch_at(["0:M5"] + self.g(*[(50, 54)] * 8)), 30000 + 30000)
-        self.assertEqual(self.run_ticks(["0:M5"] + self.g(*[(50, 52.9)] * 12))["t"], "-1")
-
-    def test_msgid3_refusal_blocks_and_clears_the_start(self):
-        # Entry 213: without the permission no switch, and the start is cleared at each refused attempt; once permitted the
-        # fail-safe counts from a fresh start: 30 start, 60 refused (cleared), 90 start, permitted, 120 switch. (The 60 s rule
-        # alone would be refused at 90 and switch at 180.)
-        self.assertEqual(self.run_ticks(["0:R"] + self.g(*[(50, 54)] * 8))["t"], "-1")
-        toks = ["0:R"] + self.g(*[(50, 54)] * 3) + ["0:P"] + self.g(*[(50, 54)] * 3)
-        self.assertEqual(self.switch_at(toks), 120000)
-
-    # The inputs the 60 s cases used before TASK-1762 (token o = flow 55 against 50, the g-cases at 54 and 58, the post-draw 62
-    # against 41) are 4-21 K over the request: they now switch through the fail-safe 30 s after the first qualifying tick. The
-    # 60 s cases themselves moved to flows inside [req + margin, req + 3.5) so they keep testing the 60 s rule.
-    def test_old_60s_case_inputs_now_switch_at_30s(self):
-        for rq, fl in ((50, 55), (50, 54), (50, 58), (35, 45)):
-            with self.subTest(req=rq, flow=fl):
-                self.assertEqual(self.switch_at(self.g(*[(rq, fl)] * 4)), 30000 + 30000)
-        self.assertEqual(self.switch_at(self.g(*[(50, 55)] * 12, dt=10000)), 10000 + 30000)
-
-    def test_failsafe_has_its_own_log_line(self):
+    def test_the_overshoot_switch_has_no_failsafe_and_no_burn_lock(self):
         src = CYCLES_INO.read_text(encoding="utf-8").replace(chr(13), "")
         body = _fn(src, "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)")
-        self.assertIn("fail-safe", body, "the fail-safe switch must narrate which rule fired (AC4)")
+        self.assertTrue(body)
+        for gone in ("FAILSAFE", "fail-safe", "_cycle_burnLeftPwm", "_cycle_burnHoldLogged"):
+            self.assertNotIn(gone, body)
+        for gone in ("SAT_OVERSHOOT_FAILSAFE", "_sustain_overshootFailsafe", "_cycle_burnLeftPwm", "_cycle_burnHoldLogged"):
+            self.assertNotIn(gone, src, "%s is gone with ADR-305" % gone)
 
 
 # TASK-1419 (Sergeant D entry 87, Q45 A): heat pumps enter PWM through the sustained-overshoot switch.
@@ -676,7 +594,7 @@ int main(int argc, char** argv) {      // argv[1] = heating source, argv[2] = re
   const float pid = (float)atof(argv[2]);
   const bool pwm = !strcmp(argv[3], "pwm");
   state.sat.eControlMode = pwm ? SAT_MODE_PWM : SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = pwm;
-  g_flow = pwm ? 10.0f : 52.5f;         // continuous: 0.5 K above 50 + 2 K margin when pid = 50 (below the 3.0 K fail-safe, TASK-1762, entry 429); pwm: far below the request
+  g_flow = pwm ? 10.0f : 53.0f;         // continuous: exactly 50 + the 3.0 K margin when pid = 50 (ADR-305); pwm: far below the request
   const SATControlMode start = state.sat.eControlMode;
   const uint32_t t0 = g_ms;
   for (int i = 0; i < 400; i++) {       // 1 s control ticks through the real gates
@@ -772,60 +690,59 @@ class LowLoadEntryCells(unittest.TestCase):
     def test_setpoint_fall_is_a_proxy_hit(self):
         # Request 60 -> 50 with the flow at 53: no overshoot at 60 (53 < 62), overshoot at 50 (53 >= 52) although the boiler is
         # modulating normally and only cools towards the new request. First qualifying tick 90 s, switch 60 s later (TASK-2005).
-        # (52.5 stays below the fail-safe 50 + 3.0 of entry 429, so this tests the switch rule.)
-        toks = self.g((60, 52.5), (60, 52.5), (50, 52.5), (50, 52.5), (50, 52.5), (50, 52.5))
+        # (53 stays below the fail-safe 50 + 3.0 of entry 429, so this tests the switch rule.)
+        toks = self.g((60, 53), (60, 53), (50, 53), (50, 53), (50, 53), (50, 53))
         self.assertEqual(self.switch_at(toks), 150000)
 
     def test_setpoint_fall_that_is_reversed_inside_60s_restarts_the_timer(self):
-        toks = self.g((60, 52.5), (50, 52.5), (60, 52.5), (50, 52.5), (50, 52.5), (50, 52.5))
+        toks = self.g((60, 53), (50, 53), (60, 53), (50, 53), (50, 53), (50, 53))
         self.assertEqual(self.switch_at(toks), 180000)
 
     def test_startup_ramp_through_the_margin_counts_from_the_first_tick_above_it(self):
-        # Cold start at high fire: the flow runs 20, 35, 50, 52.5, 52.7, 52.9 at request 50. 52.5 >= 52 is the first qualifying tick (120 s).
+        # Cold start at high fire: the flow runs 20, 35, 50, 53, 53.2, 53.4 at request 50. 53 >= 52 is the first qualifying tick (120 s).
         # (All below the fail-safe 50 + 3.0 of entry 429; a steeper ramp is test_failsafe_startup_ramp_switches_after_30s.)
         # The burner is at high power and the flow is still rising, yet the proxy fires 60 s later (TASK-2005). OT-R1 excludes
         # "shortly after boiler start-up"; SAT does not (entry 22 only runs the cold start in continuous first).
-        toks = self.g((50, 20), (50, 35), (50, 50), (50, 52.5), (50, 52.7), (50, 52.9))
+        toks = self.g((50, 20), (50, 35), (50, 50), (50, 53), (50, 53.2), (50, 53.4))
         self.assertEqual(self.switch_at(toks), 180000)
 
     def test_startup_59999ms_does_not_switch_60000ms_does(self):
-        self.assertEqual(self.switch_at(self.g((50, 52.5), (50, 52.5)) + self.g((50, 52.5), dt=29999)), -1)
-        self.assertEqual(self.switch_at(self.g((50, 52.5), (50, 52.5)) + self.g((50, 52.5), dt=30000)), 90000)
+        self.assertEqual(self.switch_at(self.g((50, 53), (50, 53)) + self.g((50, 53), dt=29999)), -1)
+        self.assertEqual(self.switch_at(self.g((50, 53), (50, 53)) + self.g((50, 53), dt=30000)), 90000)
 
     def test_valve_or_pump_step_shorter_than_60s_never_switches(self):
         # A flow step of +8 K that lasts one tick (zone valve, pump start) and returns: no switch.
-        toks = self.g((50, 45), (50, 52.5), (50, 45), (50, 45), (50, 52.5), (50, 45))
+        toks = self.g((50, 45), (50, 53), (50, 45), (50, 45), (50, 53), (50, 45))
         self.assertEqual(self.switch_at(toks), -1)
 
     def test_valve_or_pump_step_held_for_60s_switches_although_nothing_is_saturated(self):
-        toks = self.g((50, 45), (50, 52.5), (50, 52.5), (50, 52.5))
+        toks = self.g((50, 45), (50, 53), (50, 53), (50, 53))
         self.assertEqual(self.switch_at(toks), 120000)
 
     def test_a_flow_dip_inside_the_window_restarts_the_timer(self):
         # 53 @30 starts, 48 @60 (inside the 60 s window) clears it, 53 @90 starts again, fires @150 (TASK-2005)
-        toks = self.g((50, 52.5), (50, 48), (50, 52.5), (50, 52.5), (50, 52.5))
+        toks = self.g((50, 53), (50, 48), (50, 53), (50, 53), (50, 53))
         self.assertEqual(self.switch_at(toks), 150000)
 
     def test_maximum_temperature_limit_counts_like_any_other_request(self):
         # The caller clamps the request to the effective maximum (here 55) before the check. A boiler held at its limit with the
         # flow 2.0 K above it is an overshoot verdict (57, exact in binary), one 0.1 K lower is not (TASK-2005; was 1.5 K).
-        self.assertEqual(self.switch_at(self.g((55, 57), (55, 57), (55, 57))), 90000)
-        self.assertEqual(self.switch_at(self.g(*[(55, 56.9)] * 8)), -1)
+        self.assertEqual(self.switch_at(self.g((55, 58), (55, 58), (55, 58))), 90000)
+        self.assertEqual(self.switch_at(self.g(*[(55, 57.9)] * 8)), -1)
 
     def test_heat_left_after_a_hot_water_draw_is_blocked_for_300s_then_counts_60s(self):
-        # AFS 2.2.3 situation: at the end of a draw the supply stays above the request (here 43.5 against 41, inside the switch
+        # AFS 2.2.3 situation: at the end of a draw the supply stays above the request (here 44 against 41, inside the switch
         # rule's band, below the fail-safe 41 + 3.0 of entry 429). The 300 s guard keeps the entry closed (the guard is not the AFS
         # recovery: nothing is held, it only forbids the switch), and the proxy then needs 60 s of qualifying ticks: the switch
         # comes 360 s after the draw tick.
-        toks = ["30000:d"] + self.g(*[(41, 43.5)] * 14)
+        toks = ["30000:d"] + self.g(*[(41, 44)] * 14)
         self.assertEqual(self.switch_at(toks), 30000 + 360000)
 
-    def test_heat_left_far_above_the_request_after_a_draw_is_blocked_for_300s_then_the_failsafe_takes_30s(self):
-        # TASK-1762 (entry 289, our reading: the hot-water guard applies to the fail-safe as to the 60 s rule). Supply 62 against
-        # 41 (21 K over): nothing counts inside the 300 s guard; the first tick after it starts both timers and the fail-safe
-        # fires 30 s later: 330 s after the draw tick.
+    def test_heat_left_far_above_the_request_after_a_draw_is_blocked_for_300s_then_counts_60s(self):
+        # ADR-305: no fail-safe. Supply 62 against 41 (21 K over): nothing counts inside the 300 s guard; the first tick after it
+        # starts the one timer and it fires 60 s later: 360 s after the draw tick (330 s with the old 30 s fail-safe).
         toks = ["30000:d"] + self.g(*[(41, 62)] * 14)
-        self.assertEqual(self.switch_at(toks), 30000 + 330000)
+        self.assertEqual(self.switch_at(toks), 30000 + 360000)
 
     def test_true_minimum_capacity_saturation_is_a_different_path_and_takes_300s(self):
         # PWM -> continuous after 300 s of "the PWM off time is 0" (the duty asks for no OFF phase at all): it is the one
@@ -849,25 +766,25 @@ class LowLoadEntryCells(unittest.TestCase):
         self.assertLess(a, b)
 
 
-class AtMaxExitKeepsOnlyTheStartGate(unittest.TestCase):
-    """Entry 463 (Q-456g A, ADR-297): at the clamped maximum PWM ends for continuous after the 60 s start gate, without waiting for the
-    180 s flame gate of the underheat exit (entry 456). STRUCTURAL: the loop cannot be sliced on the host, so the branch is read."""
+class PwmExitsWithoutGates(unittest.TestCase):
+    """ADR-305 decision 5 (entries 463 and 456 replaced): the PWM exits carry no start gate and no flame-age gate. STRUCTURAL: the
+    loop cannot be sliced on the host, so the branch and the function are read. A request at the clamped maximum ends PWM on that
+    tick, also within 60 s of the first flame; the underheat exit has neither gate."""
 
-    def test_the_at_max_branch_has_the_start_gate_and_no_flame_gate(self):
-        s = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+    def test_the_at_max_branch_has_no_start_gate_and_no_flame_gate(self):
+        s = SAT_INO.read_text(encoding="utf-8").replace(chr(13), "")
         a = s.index("if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM")
         branch = s[a:s.index("}", a)]
-        self.assertIn("!satStartGateActive()", branch)                       # the 60 s start gate (entries 385/387, ADR-252)
+        self.assertNotIn("satStartGateActive", branch)
         self.assertNotRegex(branch, r"flameEstablished|SAT_UNDERHEAT_FLAME_MIN_MS|satCycleGetFlameOnStartMs")
         self.assertIn("SAT_MODE_CONTINUOUS", branch)
 
-    def test_the_underheat_exit_has_the_flame_gate_and_the_start_gate(self):
-        c = CYCLES_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+    def test_the_underheat_exit_has_no_flame_gate_and_no_start_gate(self):
+        c = CYCLES_INO.read_text(encoding="utf-8").replace(chr(13), "")
         a = c.index("bool satCycleCheckPwmExits(")
-        body = c[a:c.index("\n}\n", a)]
-        self.assertRegex(body, r"flameEstablished\s*=\s*satIsFlameOn\(\)")
-        self.assertIn("SAT_UNDERHEAT_FLAME_MIN_MS", body)
-        self.assertIn("!satStartGateActive()", body)
+        body = c[a:c.index(chr(10) + "}" + chr(10), a)]
+        self.assertNotRegex(body, r"flameEstablished|SAT_UNDERHEAT_FLAME_MIN_MS|satCycleGetFlameOnStartMs")
+        self.assertNotIn("satStartGateActive", body)
 
 
 class GateHeatPumpSwitch(unittest.TestCase):
@@ -879,7 +796,7 @@ class GateHeatPumpSwitch(unittest.TestCase):
         flag, body = extract(cyc)
         gate = extract_gate(SAT_INO.read_text(encoding="utf-8"))
         cpp = d / "g.cpp"
-        cpp.write_text(flag + STUBS + GATE_STUBS + body + gate + GATE_MAIN, encoding="utf-8")
+        cpp.write_text(flag + "#define GATE_REAL_COLD 1" + chr(10) + STUBS + GATE_STUBS + body + gate + GATE_MAIN, encoding="utf-8")
         cls.exe = compile_cpp(cpp, d / "g.exe")
 
     @classmethod
