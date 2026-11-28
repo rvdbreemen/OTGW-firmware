@@ -12618,7 +12618,7 @@
         ],
         "must_not": [
           "Pause PWM on a demand stop, or restore the PWM phase after a restart, before the coordinator decides on the capture count.",
-          "Change the overshoot reference before the replay decides (d2).",
+          "Change the overshoot reference: (d2) is not adopted, entry 497 stays.",
           "Raise the 180 s minimum burn or band wait together with the ignition wait.",
           "Change the margin setting, its default or its migration (ADR-306)."
         ],
@@ -12633,8 +12633,75 @@
           "a 120 s PWM underheat cycle is uncertain;",
           "a 0.0 return gives the flow-based hold.",
           "Unchanged: the band still waits 180 s (entry 376 test unchanged).",
-          "Replays of the indigo and gruijter recordings for (a), (d1) and the (d2) count.",
+          "Replays (open loop, otgw-poc-dev, OTGW-field-data/replaytools/pocdevstep1/out/TABLEcurrentvsnew.md, read by otgw-architect):",
+          "(a): the 180 s flame gate removes 4 of 5 underheat triggers on gruijter (5 to 1) and 2 of 2 on marceld91d (2 to 0); the saturation exit takes over (gruijter 9 to 11, marceld91d 2 to 4), so the entry-492 order (saturation before underheat...",
+          "(d1): no change in these data.",
+          "(d2): the count above.",
+          "Not covered by the replay: (h), (i) and (k).",
           "Bench run by otgw-bench-tester after the build slot, not before 18:55. Nothing from this ADR is in the 313c4ba beta."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-308",
+      "title": "SAT heating curve self-tune counts a very-low-power hour when the room is more than 0.1 C below target (amends ADR-205)",
+      "path": "ADR-308-sat-heating-curve-self-tune-counts-a-very-low-power-hour-when-the-room-is-more-than-0-1-c-below-target-amends-adr-205.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-28",
+      "decision_summary": "The minmod exclusion of the self-tune no longer applies to a tick whose error is above SATCTPHASEBANDC (0.1 C, SATcur...",
+      "topics": [
+        "heating-curve-self-tune",
+        "minimum-modulation",
+        "sat"
+      ],
+      "aliases": [
+        "count low-power hours",
+        "min_mod exclusion",
+        "Q-3106b",
+        "TASK-3106"
+      ],
+      "components": [
+        "SAT heating curve self-tune"
+      ],
+      "symbols": [
+        "SAT_CT_PHASE_BAND_C",
+        "SATT_MIN_MOD",
+        "satTuneTickReason"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Skip minmod only for a tick with a finite error above SATCTPHASEBANDC.",
+          "Keep the order of every other exclusion in satTuneTickReason().",
+          "Have a host test on the pure tuner block (tests/testsatcurveselftune.py) that is red on the code before this ADR and green after:",
+          "a minimum-modulation tick at error 0.2 counts;",
+          "one at error 0.1 and one at error 0.05 are excluded as minmod;",
+          "one with a NaN error is excluded (noroom or minmod, as today)."
+        ],
+        "must_not": [
+          "Change the step, the window, the band, the phase split or the PWM rule.",
+          "Count a minimum-modulation tick when the room is at or above target - 0.1 C.",
+          "Add a new tuner setting for this rule."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "The host test above, red then green (owner otgw-poc-dev).",
+          "The replay of REPORT.md rerun on the built code, with indigolight beta.428 at the 0.1 C threshold: expected 9 counted hours and no decision in 25 h. A different result is a finding.",
+          "The bench run by otgw-bench-tester: the self-tune hour line still logs, and a minimum-modulation hour below target - 0.1 counts (simulation)."
         ]
       },
       "scope": {
@@ -20868,6 +20935,36 @@
     {
       "source": "ADR-307",
       "target": "ADR-306",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-308",
+      "target": "ADR-205",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-308",
+      "target": "ADR-228",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-308",
+      "target": "ADR-231",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-308",
+      "target": "ADR-234",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-308",
+      "target": "ADR-260",
       "type": "related",
       "resolved": true
     }
