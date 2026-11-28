@@ -65,11 +65,12 @@ The margin of the continuous-to-PWM rule of ADR-305 is the user setting `satpwms
 
 - The setting stays, with its key, its REST (Representational State Transfer) field `pwm_switch_margin`, its MQTT (Message Queuing Telemetry Transport) topic `sat/pwm_switch_margin`, its web UI field and its range 0.5-5.0. Only its default changes, from 2.0 to 3.0.
 - ADR-305's text "the setting `satpwmswitchmargin` is removed, and an old key in `settings.ini` is ignored on load" no longer holds. The Must Not "Use the setting `satpwmswitchmargin` ... for a mode decision" no longer holds for this rule.
-- **The end-of-cycle verdict uses the same setting** (decided by the coordinator, 09:02). A continuous cycle whose tail p90 of flow minus control setpoint is at or above `satpwmswitchmargin` gets the OVERSHOOT verdict and enables PWM. This replaces ADR-305's "fixed 3.0, with `satovershootmargin` as the label only" for the verdict.
+- **The end-of-cycle verdict uses the same setting** (decided by the coordinator, 09:02; register entry 523). A continuous cycle whose tail p90 of flow minus control setpoint is at or above `satpwmswitchmargin` gets the OVERSHOOT verdict and enables PWM. This replaces ADR-305's "fixed 3.0, with `satovershootmargin` as the label only" for the verdict.
   - Reason: thermo-nova uses one constant, `OVERSHOOT_MARGIN_CELSIUS` (`cycles/const.py:10`), both for the runtime enable (`heating_control.py:288`) and for the verdict (`cycles/classifier.py:74`). One margin with one meaning keeps the two paths from disagreeing.
 - **`satovershootmargin` does not change** (key, default 2.0, range). It still labels the classification shown to the user (`SATcycles.ino:961`) and feeds the overshoot-seconds count (`SATcycles.ino:1287`). It decides no mode. With both settings at their defaults (2.0 and 3.0), a cycle with a p90 between 2.0 and 3.0 shows the label OVERSHOOT while the verdict leaves the mode as it is. The verdict decides the mode.
+- **Register.** Entry 523 (OTGW-sat-decisions main ec2c041) records the verdict and migration decisions of the coordinator. It supersedes the part of entry 522 that reads "verdict + underheat stay 3.0" for the verdict. Entry 522 stands for the setting with default 3.0, and for the underheat exit.
 - **The underheat exit stays fixed:** requested - 3.0 C for 180 s (ADR-305 Decision 3, `cycles/const.py:11`). The 60 s hold and the 300 s saturation exit also stay as ADR-305 has them.
-- **One-time migration to 3.0** (decided by the coordinator, 09:02; reversible; Robert is told).
+- **One-time migration to 3.0** (decided by the coordinator, 09:02; reversible; Robert is told; register entry 523).
   - A new marker `SATpwmmargin3` is added.
   - If the marker is missing at load, a stored `SATpwmswitchmargin` of 1.5 or 2.0 (both old defaults) becomes 3.0 once.
   - Any other stored value is a user choice and stays.
