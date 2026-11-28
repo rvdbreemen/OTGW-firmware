@@ -4585,7 +4585,7 @@ void satHandleControlMode(const char* value)
   // automations that send it do not break; it answers with a log line and changes nothing (sat/control_mode stays 0 = auto).
   // "off" above is not a mode: it is the SAT switch-off and stays. Removal of the endpoint comes in a later release.
   SATDebugTf(PSTR("SAT: control_mode '%s' ignored, control_mode is no longer used\r\n"), value);
-  satNarratef_P(PSTR("control_mode '%s' is no longer used: SAT switches between continuous and PWM by itself"), value);
+  satNarratef_P(PSTR("control_mode '%.16s' is no longer used: SAT switches between continuous and PWM by itself"), value);   // the value comes from outside: bounded
 }
 
 //=====================================================================

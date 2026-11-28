@@ -29,6 +29,8 @@ KNOWN_S_WIDTHS = {
     "Flame off: cycle %s": [13],
     # SATcycles.ino PWM veto narration: the longer of its two fixed reasons (63 characters)
     "PWM refused (path %u): %s": [63],
+    # SATcontrol.ino satHandleControlMode() (TASK-3151.4): the ignored command value, printed with %.16s, so at most 16 characters
+    "control_mode '%.16s' is no longer used": [16],
     # SATble.ino satBleSelect...(): the pinned MAC, settings.sat.sBleMAC is char[18] (17 characters), printed with %.17s (TASK-3056)
     "SAT uses BLE sensor %.17s": [17],
 }
